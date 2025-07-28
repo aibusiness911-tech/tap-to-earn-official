@@ -10,6 +10,7 @@ const PORT = process.env.PORT || 3000;
 // Bot configuration
 const BOT_TOKEN = '8105964064:AAE1rkye54RSBevmnYIIOBpCZnAkrMX-VsE';
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
+const WEB_APP_URL = 'https://tap-to-earn-bot-production.up.railway.app';
 
 // Middleware
 app.use(express.json());
@@ -156,7 +157,7 @@ Click the button below to start earning!`;
             bot.sendMessage(chatId, welcomeMessage, {
                 reply_markup: {
                     inline_keyboard: [[
-                        { text: '🚀 Start Earning', web_app: { url: `http://localhost:3000` } }
+                        { text: '🚀 Start Earning', web_app: { url: WEB_APP_URL } }
                     ]]
                 }
             });
@@ -164,7 +165,7 @@ Click the button below to start earning!`;
             bot.sendMessage(chatId, `👋 Welcome back ${firstName}! Ready to earn some TON?`, {
                 reply_markup: {
                     inline_keyboard: [[
-                        { text: '💰 Open App', web_app: { url: `http://localhost:3000` } }
+                        { text: '💰 Open App', web_app: { url: WEB_APP_URL } }
                     ]]
                 }
             });
