@@ -716,3 +716,122 @@
     </script>
 </body>
 </html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tap to Earn</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.3/css/bulma.min.css">
+  <style>
+    body {
+      background-color: #f4f4f9;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      padding: 20px;
+    }
+    .balance {
+      font-size: 2em;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .ton-symbol {
+      color: #0098ea;
+    }
+    .button-container {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      margin: 20px 0;
+    }
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0,0,0,0.5);
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-content {
+      background-color: white;
+      padding: 20px;
+      border-radius: 10px;
+      width: 90%;
+      max-width: 400px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1 class="title has-text-centered">🚀 Tap to Earn</h1>
+
+  <div class="balance">
+    <span class="ton-symbol">TON</span> <span id="balance">0.00</span><br>
+    <small id="usdValue" style="font-size: 0.6em; opacity: 0.8;">≈ $0.00</small>
+  </div>
+
+  <div class="button-container">
+    <button class="button is-link is-fullwidth" onclick="earnPoints()">💰 Tap to Earn</button>
+    <button class="button is-success is-fullwidth" onclick="selectPackage(5, '5 USD Package')">Buy $5 Package</button>
+    <button class="button is-success is-fullwidth" onclick="selectPackage(50, '50 USD Package')">Buy $50 Package</button>
+    <button class="button is-success is-fullwidth" onclick="selectPackage(100, '100 USD Package')">Buy $100 Package</button>
+    <button class="button is-success is-fullwidth" onclick="selectPackage(1000, '1000 USD Package')">Buy $1000 Package</button>
+  </div>
+
+  <!-- Popup Modal -->
+  <div class="modal" id="paymentModal">
+    <div class="modal-content">
+      <h2 class="subtitle" id="modalTitle"></h2>
+      <p id="modalAmount"></p>
+      <p>Send TON to this wallet:</p>
+      <p style="word-break: break-all;" id="walletAddress">EQDX5V7...YourTONWalletHere</p>
+      <div class="buttons mt-3">
+        <button class="button is-light" onclick="copyAddress()">📋 Copy Address</button>
+        <a class="button is-link" id="openWalletLink" href="#" target="_blank">🌐 Open Wallet</a>
+        <button class="button is-danger" onclick="closeModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const walletAddress = 'EQDX5V7YOURTONWALLETHERE';
+    const tonPriceInUSD = 7.00; // Static rate, update later if needed
+
+    const gameState = {
+      balance: 0,
+    };
+
+    function earnPoints() {
+      gameState.balance += 0.5; // Example earn amount
+      updateUI();
+    }
+
+    function updateUI() {
+      document.getElementById('balance').textContent = gameState.balance.toFixed(2);
+      const usdValue = gameState.balance * tonPriceInUSD;
+      document.getElementById('usdValue').textContent = `≈ $${usdValue.toFixed(2)}`;
+    }
+
+    function selectPackage(usdPrice, packageName) {
+      const tonAmount = (usdPrice / tonPriceInUSD).toFixed(2);
+      document.getElementById('modalTitle').textContent = `Buy ${packageName}`;
+      document.getElementById('modalAmount').textContent = `💵 $${usdPrice} = 🪙 ${tonAmount} TON`;
+      document.getElementById('walletAddress').textContent = walletAddress;
+      document.getElementById('openWalletLink').href = `https://tonkeeper.com/transfer/${walletAddress}?amount=${tonAmount}`;
+      document.getElementById('paymentModal').style.display = 'flex';
+    }
+
+    function closeModal() {
+      document.getElementById('paymentModal').style.display = 'none';
+    }
+
+    function copyAddress() {
+      navigator.clipboard.writeText(walletAddress);
+      alert('Wallet address copied!');
+    }
+
+    updateUI();
+  </script>
+</body>
+</html>
