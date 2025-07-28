@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tap to Earn</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 400px;
+            margin: 0 auto;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            text-align: center;
+            padding: 20px;
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .balance {
+            font-size: 2em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .ton-symbol {
+            color: #0088cc;
+            font-weight: bold;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .tap-button {
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            background: linear-gradient(45deg, #ff6b6b, #feca57);
+            border: none;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5em;
+            font-weight: bold;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .tap-button:active {
+            transform: scale(0.95);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .tap-button:hover {
+            transform: scale(1.05);
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            padding: 15px;
+            border-radius: 15px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.3em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            opacity: 0.8;
+        }
+
+        .tabs {
+            display: flex;
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .tab {
+            flex: 1;
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            border: none;
+            background: none;
+            color: white;
+            font-size: 0.9em;
+            transition: background 0.3s ease;
+        }
+
+        .tab.active {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .tab-content {
+            display: none;
+            padding: 20px;
+            height: 400px;
+            overflow-y: auto;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .package-card {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .package-card:hover {
+            background: rgba(255,255,255,0.2);
+            transform: translateY(-2px);
+        }
+
+        .package-price {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #feca57;
+        }
+
+        .package-profit {
+            font-size: 1.2em;
+            color: #2ed573;
+            margin: 10px 0;
+        }
+
+        .package-duration {
+            opacity: 0.8;
+            font-size: 0.9em;
+        }
+
+        .wallet-input {
+            width: 100%;
+            padding: 15px;
+            border-radius: 10px;
+            border: none;
+            background: rgba(255,255,255,0.1);
+            color: white;
+            font-size: 1em;
+            margin-bottom: 15px;
+        }
+
+        .wallet-input::placeholder {
+            color: rgba(255,255,255,0.6);
+        }
+
+        .btn {
+            width: 100%;
+            padding: 15px;
+            border-radius: 10px;
+            border: none;
+            background: linear-gradient(45deg, #2ed573, #17a2b8);
+            color: white;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .floating-plus {
+            position: absolute;
+            font-size: 2em;
+            font-weight: bold;
+            color: #feca57;
+            pointer-events: none;
+            animation: floatUp 1s ease-out forwards;
+        }
+
+        @keyframes floatUp {
+            0% {
+                opacity: 1;
+                transform: translateY(0);
+            }
+            100% {
+                opacity: 0;
+                transform: translateY(-100px);
+            }
+        }
+
+        .referral-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .error-message {
+            background: rgba(255, 0, 0, 0.2);
+            color: #ff6b6b;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="balance"><span class="ton-symbol">TON</span> <span id="balance">0.00</span></div>
+            <div>Total Earnings</div>
+        </div>
+
+        <div class="main-content" id="main-tab">
+            <button class="tap-button" id="tapButton">
+                TAP TO EARN
+            </button>
+            
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="stat-value" id="todayTaps">0</div>
+                    <div class="stat-label">Today's Taps</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="remainingTaps">100</div>
+                    <div class="stat-label">Remaining Taps</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="activePackages">0</div>
+                    <div class="stat-label">Active Packages</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="timeLeft">--</div>
+                    <div class="stat-label">Time Left</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-content" id="packages-tab">
+            <h3 style="margin-bottom: 20px; text-align: center;">Choose Package</h3>
+            <div class="package-card" onclick="selectPackage(5, 10)">
+                <div class="package-price">$5 Package</div>
+                <div class="package-profit">Earn up to $10</div>
+                <div class="package-duration">30 days • 100% profit</div>
+            </div>
+            <div class="package-card" onclick="selectPackage(25, 62.5)">
+                <div class="package-price">$25 Package</div>
+                <div class="package-profit">Earn up to $62.5</div>
+                <div class="package-duration">30 days • 150% profit</div>
+            </div>
+            <div class="package-card" onclick="selectPackage(50, 150)">
+                <div class="package-price">$50 Package</div>
+                <div class="package-profit">Earn up to $150</div>
+                <div class="package-duration">30 days • 200% profit</div>
+            </div>
+            <div class="package-card" onclick="selectPackage(100, 350)">
+                <div class="package-price">$100 Package</div>
+                <div class="package-profit">Earn up to $350</div>
+                <div class="package-duration">30 days • 250% profit</div>
+            </div>
+            <div class="package-card" onclick="selectPackage(500, 2000)">
+                <div class="package-price">$500 Package</div>
+                <div class="package-profit">Earn up to $2000</div>
+                <div class="package-duration">30 days • 300% profit</div>
+            </div>
+            <div class="package-card" onclick="selectPackage(1000, 2500)">
+                <div class="package-price">$1000 Package</div>
+                <div class="package-profit">Earn up to $2500</div>
+                <div class="package-duration">30 days • 150% profit</div>
+            </div>
+        </div>
+
+        <div class="tab-content" id="wallet-tab">
+            <h3 style="margin-bottom: 20px; text-align: center;">Wallet Settings</h3>
+            <input type="text" class="wallet-input" id="walletAddress" placeholder="Enter your TON wallet address">
+            <button class="btn" onclick="saveWallet()">Save Wallet Address</button>
+            <div style="margin-top: 30px;">
+                <h4 style="margin-bottom: 15px;">Current Wallet:</h4>
+                <div style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 10px; word-break: break-all;" id="currentWallet">
+                    Not set
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-content" id="withdraw-tab">
+            <h3 style="margin-bottom: 20px; text-align: center;">Withdraw Earnings</h3>
+            <div class="stat-card" style="margin-bottom: 20px;">
+                <div class="stat-value"><span class="ton-symbol">TON</span> <span id="withdrawBalance">0.00</span></div>
+                <div class="stat-label">Available for Withdrawal</div>
+            </div>
+            <input type="number" class="wallet-input" id="withdrawAmount" placeholder="Enter amount to withdraw" step="0.01">
+            <button class="btn" onclick="withdraw()">Withdraw TON</button>
+            <div style="margin-top: 20px; font-size: 0.9em; opacity: 0.8; text-align: center;">
+                Minimum withdrawal: 1 TON<br>
+                Processing time: 24-48 hours
+            </div>
+        </div>
+
+        <div class="tab-content" id="referral-tab">
+            <h3 style="margin-bottom: 20px; text-align: center;">Referral Program</h3>
+            <div class="referral-stats">
+                <div class="stat-card">
+                    <div class="stat-value" id="referralCount">0</div>
+                    <div class="stat-label">Total Referrals</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="referralEarnings">0</div>
+                    <div class="stat-label">Referral Earnings</div>
+                </div>
+            </div>
+            <div style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 10px; margin-bottom: 15px;">
+                <div style="margin-bottom: 10px; font-weight: bold;">Your Referral Link:</div>
+                <div style="word-break: break-all; font-size: 0.9em;" id="referralLink">
+                    https://t.me/Taptoearnofficial_bot?start=ref_USER_ID
+                </div>
+            </div>
+            <button class="btn" onclick="shareReferral()">Share Referral Link</button>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('main')">Home</button>
+            <button class="tab" onclick="switchTab('packages')">Packages</button>
+            <button class="tab" onclick="switchTab('wallet')">Wallet</button>
+            <button class="tab" onclick="switchTab('withdraw')">Withdraw</button>
+            <button class="tab" onclick="switchTab('referral')">Referral</button>
+        </div>
+    </div>
+
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script>
+        // Check if Telegram WebApp is available
+        if (typeof window.Telegram === 'undefined' || !window.Telegram.WebApp) {
+            document.body.innerHTML = `
+                <div class="error-message">
+                    <h3>⚠️ Not in Telegram</h3>
+                    <p>This app only works inside Telegram as a Mini App.</p>
+                    <p>Please access it through @Taptoearnofficial_bot</p>
+                </div>
+            `;
+        } else {
+            // Initialize Telegram WebApp
+            const tg = window.Telegram.WebApp;
+            tg.ready();
+            tg.expand();
+
+            // Get user data from Telegram
+            const user = tg.initDataUnsafe?.user;
+            const telegramId = user?.id || 123456789; // fallback for testing
+
+            // API base URL
+            const API_BASE = window.location.origin;
+
+            // Game state
+            let gameState = {
+                balance: 0,
+                todayTaps: 0,
+                remainingTaps: 100,
+                activePackages: 0,
+                walletAddress: '',
+                packages: [],
+                referrals: 0,
+                referralEarnings: 0,
+                telegramId: telegramId
+            };
+
+            // Load user data from server
+            async function loadGameState() {
+                try {
+                    const response = await fetch(`${API_BASE}/api/user/${telegramId}`);
+                    if (response.ok) {
+                        const userData = await response.json();
+                        gameState = {
+                            balance: userData.balance || 0,
+                            todayTaps: userData.today_taps || 0,
+                            remainingTaps: userData.remaining_taps || 100,
+                            activePackages: userData.active_packages || 0,
+                            walletAddress: userData.wallet_address || '',
+                            packages: userData.packages || [],
+                            referrals: userData.referral_count || 0,
+                            referralEarnings: userData.referral_earnings || 0,
+                            telegramId: telegramId
+                        };
+                        updateUI();
+                    }
+                } catch (error) {
+                    console.error('Error loading user data:', error);
+                    // Fallback to localStorage for offline mode
+                    const saved = localStorage.getItem('tapToEarnState');
+                    if (saved) {
+                        gameState = { ...gameState, ...JSON.parse(saved) };
+                        updateUI();
+                    }
+                }
+            }
+
+            // Save game state (backup to localStorage)
+            function saveGameState() {
+                localStorage.setItem('tapToEarnState', JSON.stringify(gameState));
+            }
+
+            // Update UI elements
+            function updateUI() {
+                document.getElementById('balance').textContent = gameState.balance.toFixed(4);
+                document.getElementById('todayTaps').textContent = gameState.todayTaps;
+                document.getElementById('remainingTaps').textContent = gameState.remainingTaps;
+                document.getElementById('activePackages').textContent = gameState.activePackages;
+                document.getElementById('withdrawBalance').textContent = gameState.balance.toFixed(4);
+                document.getElementById('currentWallet').textContent = gameState.walletAddress || 'Not set';
+                document.getElementById('referralCount').textContent = gameState.referrals;
+                document.getElementById('referralEarnings').textContent = gameState.referralEarnings.toFixed(4);
+                
+                updateTimeLeft();
+            }
+
+            // Tap button functionality
+            document.getElementById('tapButton').addEventListener('click', async function(e) {
+                if (gameState.remainingTaps > 0 && gameState.activePackages > 0) {
+                    try {
+                        const response = await fetch(`${API_BASE}/api/tap`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                telegramId: telegramId
+                            })
+                        });
+
+                        if (response.ok) {
+                            const result = await response.json();
+                            gameState.balance = result.new_balance;
+                            gameState.todayTaps++;
+                            gameState.remainingTaps = result.remaining_taps;
+                            
+                            // Create floating animation
+                            createFloatingText(`+${result.earned.toFixed(4)}`, e.target);
+                            
+                            updateUI();
+                            saveGameState();
+                            
+                            // Haptic feedback
+                            if (tg.HapticFeedback) {
+                                tg.HapticFeedback.impactOccurred('light');
+                            }
+                        } else {
+                            const error = await response.json();
+                            tg.showAlert(error.error || 'Error processing tap');
+                        }
+                    } catch (error) {
+                        console.error('Tap error:', error);
+                        tg.showAlert('Network error. Please try again.');
+                    }
+                } else if (gameState.activePackages === 0) {
+                    tg.showAlert('Please purchase a package first!');
+                } else {
+                    tg.showAlert('No taps remaining for today!');
+                }
+            });
+
+            // Create floating text animation
+            function createFloatingText(text, element) {
+                const floating = document.createElement('div');
+                floating.textContent = text;
+                floating.className = 'floating-plus';
+                floating.style.left = Math.random() * 100 + 'px';
+                floating.style.top = '50%';
+                element.appendChild(floating);
+                
+                setTimeout(() => {
+                    floating.remove();
+                }, 1000);
+            }
+
+            // Tab switching
+            function switchTab(tabName) {
+                // Hide all content
+                document.querySelectorAll('.tab-content, .main-content').forEach(el => {
+                    el.style.display = 'none';
+                });
+                
+                // Remove active class from all tabs
+                document.querySelectorAll('.tab').forEach(el => {
+                    el.classList.remove('active');
+                });
+                
+                // Show selected content
+                if (tabName === 'main') {
+                    document.getElementById('main-tab').style.display = 'flex';
+                    document.querySelector('.tab').classList.add('active');
+                } else {
+                    document.getElementById(tabName + '-tab').style.display = 'block';
+                    event.target.classList.add('active');
+                }
+            }
+
+            // Package selection
+            async function selectPackage(price, maxEarn) {
+                const packageType = `$${price} Package`;
+                const confirmed = confirm(`Purchase ${packageType} to earn up to $${maxEarn}?`);
+                
+                if (confirmed) {
+                    try {
+                        const response = await fetch(`${API_BASE}/api/purchase-package`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                telegramId: telegramId,
+                                packageType: packageType,
+                                price: price,
+                                maxEarn: maxEarn
+                            })
+                        });
+
+                        if (response.ok) {
+                            const result = await response.json();
+                            gameState.activePackages++;
+                            gameState.remainingTaps = 100;
+                            updateUI();
+                            saveGameState();
+                            tg.showAlert('Package purchased successfully!');
+                            
+                            await loadGameState();
+                        } else {
+                            const error = await response.json();
+                            tg.showAlert(error.error || 'Error purchasing package');
+                        }
+                    } catch (error) {
+                        console.error('Package purchase error:', error);
+                        tg.showAlert('Network error. Please try again.');
+                    }
+                }
+            }
+
+            // Wallet functions
+            async function saveWallet() {
+                const address = document.getElementById('walletAddress').value.trim();
+                if (address) {
+                    try {
+                        const response = await fetch(`${API_BASE}/api/update-wallet`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                telegramId: telegramId,
+                                walletAddress: address
+                            })
+                        });
+
+                        if (response.ok) {
+                            gameState.walletAddress = address;
+                            saveGameState();
+                            updateUI();
+                            tg.showAlert('Wallet address saved!');
+                        } else {
+                            const error = await response.json();
+                            tg.showAlert(error.error || 'Error saving wallet');
+                        }
+                    } catch (error) {
+                        console.error('Wallet save error:', error);
+                        tg.showAlert('Network error. Please try again.');
+                    }
+                }
+            }
+
+            async function withdraw() {
+                const amount = parseFloat(document.getElementById('withdrawAmount').value);
+                
+                if (!gameState.walletAddress) {
+                    tg.showAlert('Please set your wallet address first!');
+                    return;
+                }
+                if (amount < 1) {
+                    tg.showAlert('Minimum withdrawal is 1 TON');
+                    return;
+                }
+                if (amount > gameState.balance) {
+                    tg.showAlert('Insufficient balance');
+                    return;
+                }
+                
+                try {
+                    const response = await fetch(`${API_BASE}/api/withdraw`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            telegramId: telegramId,
+                            amount: amount
+                        })
+                    });
+
+                    if (response.ok) {
+                        const result = await response.json();
+                        gameState.balance = result.new_balance;
+                        updateUI();
+                        saveGameState();
+                        tg.showAlert(`Withdrawal of ${amount} TON initiated!`);
+                    } else {
+                        const error = await response.json();
+                        tg.showAlert(error.error || 'Error processing withdrawal');
+                    }
+                } catch (error) {
+                    console.error('Withdrawal error:', error);
+                    tg.showAlert('Network error. Please try again.');
+                }
+            }
+
+            // Referral functions
+            function shareReferral() {
+                const referralLink = `https://t.me/Taptoearnofficial_bot?start=ref_${telegramId}`;
+                
+                if (navigator.share) {
+                    navigator.share({
+                        title: 'Join Tap to Earn!',
+                        text: 'Tap to earn real money with TON cryptocurrency!',
+                        url: referralLink
+                    });
+                } else {
+                    navigator.clipboard.writeText(referralLink).then(() => {
+                        tg.showAlert('Referral link copied to clipboard!');
+                    }).catch(() => {
+                        tg.showAlert(`Share this link: ${referralLink}`);
+                    });
+                }
+            }
+
+            // Update time left for packages
+            function updateTimeLeft() {
+                if (gameState.packages && gameState.packages.length > 0) {
+                    const activePackage = gameState.packages.find(p => p.is_active);
+                    if (activePackage) {
+                        const expiry = new Date(activePackage.expiry_date);
+                        const now = new Date();
+                        const diff = expiry - now;
+                        
+                        if (diff > 0) {
+                            const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+                            const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                            document.getElementById('timeLeft').textContent = `${days}d ${hours}h`;
+                        } else {
+                            document.getElementById('timeLeft').textContent = 'Expired';
+                        }
+                    } else {
+                        document.getElementById('timeLeft').textContent = '--';
+                    }
+                } else {
+                    document.getElementById('timeLeft').textContent = '--';
+                }
+            }
+
+            // Initialize app
+            async function initApp() {
+                await loadGameState();
+                updateUI();
+                
+                document.getElementById('referralLink').textContent = 
+                    `https://t.me/Taptoearnofficial_bot?start=ref_${telegramId}`;
+            }
+
+            // Make functions global for onclick attributes
+            window.switchTab = switchTab;
+            window.selectPackage = selectPackage;
+            window.saveWallet = saveWallet;
+            window.withdraw = withdraw;
+            window.shareReferral = shareReferral;
+
+            // Start the app
+            initApp();
+
+            // Update time left every minute
+            setInterval(updateTimeLeft, 60000);
+        }
+    </script>
+</body>
+</html>
