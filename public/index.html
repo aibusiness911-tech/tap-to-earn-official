@@ -1,129 +1,432 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>TON Tap App</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="style.css">
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tap to Earn Bot</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            overflow-x: hidden;
+        }
+
+        .app-container {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .balance {
+            font-size: 18px;
+            opacity: 0.9;
+        }
+
+        .tabs {
+            display: flex;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .tab {
+            flex: 1;
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: none;
+            background: transparent;
+            color: white;
+            font-size: 16px;
+        }
+
+        .tab.active {
+            background: rgba(255, 255, 255, 0.2);
+            font-weight: bold;
+        }
+
+        .tab:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .content {
+            flex: 1;
+            padding: 20px;
+        }
+
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.3s;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Main Tab Styles */
+        .tap-button {
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            background: linear-gradient(45deg, #FFD700, #FFA500);
+            border: none;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 20px auto;
+            display: block;
+            box-shadow: 0 10px 30px rgba(255, 215, 0, 0.3);
+            transition: all 0.3s;
+        }
+
+        .tap-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 15px 40px rgba(255, 215, 0, 0.4);
+        }
+
+        .tap-button:active {
+            transform: scale(0.95);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .stat-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #FFD700;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            opacity: 0.8;
+            margin-top: 5px;
+        }
+
+        /* Referrals Tab Styles */
+        .referral-link {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            word-break: break-all;
+        }
+
+        .copy-btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        .referral-list {
+            margin-top: 20px;
+        }
+
+        .referral-item {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* Packages Tab Styles */
+        .packages-grid {
+            display: grid;
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .package-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s;
+        }
+
+        .package-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .package-title {
+            font-size: 20px;
+            font-weight: bold;
+            color: #FFD700;
+            margin-bottom: 10px;
+        }
+
+        .package-details {
+            margin: 15px 0;
+        }
+
+        .package-detail {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+            font-size: 14px;
+        }
+
+        .buy-btn {
+            width: 100%;
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            margin-top: 15px;
+            transition: all 0.3s;
+        }
+
+        .buy-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(76, 175, 80, 0.3);
+        }
+
+        /* Withdrawal Styles */
+        .withdrawal-section {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 15px;
+            margin: 20px 0;
+        }
+
+        .input-group {
+            margin: 15px 0;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            font-size: 16px;
+        }
+
+        .input-group input::placeholder {
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .withdraw-btn {
+            background: linear-gradient(45deg, #FF6B6B, #FF5252);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            width: 100%;
+            margin-top: 15px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .success-msg, .error-msg {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .success-msg {
+            background: rgba(76, 175, 80, 0.2);
+            border: 1px solid #4CAF50;
+            color: #4CAF50;
+        }
+
+        .error-msg {
+            background: rgba(244, 67, 54, 0.2);
+            border: 1px solid #f44336;
+            color: #f44336;
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                padding: 15px;
+            }
+            
+            .header h1 {
+                font-size: 20px;
+            }
+            
+            .tap-button {
+                width: 150px;
+                height: 150px;
+                font-size: 20px;
+            }
+            
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
 </head>
 <body>
-  <div class="tabs">
-    <button class="tab-btn active" data-tab="main">Main</button>
-    <button class="tab-btn" data-tab="referrals">Referrals</button>
-    <button class="tab-btn" data-tab="packages">Packages</button>
-  </div>
-
-  <div id="main" class="tab-content active">
-    <div class="balance-card">
-      <h2>Your Balance</h2>
-      <div class="balance-values">
-        <div class="balance-item">
-          <span class="label">Points:</span>
-          <span id="points" class="value">0</span>
+    <div class="app-container">
+        <div class="header">
+            <h1>💎 Tap to Earn</h1>
+            <div class="balance" id="mainBalance">Loading...</div>
         </div>
-        <div class="balance-item">
-          <span class="label">USD Value:</span>
-          <span id="usd-value" class="value">$0.00</span>
+
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('main')">🏠 Main</button>
+            <button class="tab" onclick="showTab('referrals')">👥 Referrals</button>
+            <button class="tab" onclick="showTab('packages')">📦 Packages</button>
         </div>
-        <div class="balance-item">
-          <span class="label">TON Value:</span>
-          <span id="ton-value" class="value">0 TON</span>
-        </div>
-      </div>
-    </div>
 
-    <div class="tap-area">
-      <button id="tap-btn" class="tap-button">TAP TO EARN</button>
-      <div class="tap-info">
-        <p>Taps left today: <span id="taps-left">100</span>/100</p>
-        <p>Current rate: <span id="tap-rate">0.05</span> points/tap</p>
-      </div>
-    </div>
+        <div class="content">
+            <!-- Main Tab -->
+            <div id="main" class="tab-content active">
+                <div class="loading" id="mainLoading">
+                    <div class="spinner"></div>
+                    <p>Loading your data...</p>
+                </div>
+                
+                <div id="mainContent" style="display: none;">
+                    <button class="tap-button" id="tapButton" onclick="tap()">
+                        TAP!
+                    </button>
+                    
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-value" id="points">0</div>
+                            <div class="stat-label">Points</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="dollarValue">$0.00</div>
+                            <div class="stat-label">USD Value</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="tonValue">0 TON</div>
+                            <div class="stat-label">TON Value</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="tapsRemaining">100</div>
+                            <div class="stat-label">Taps Left</div>
+                        </div>
+                    </div>
 
-    <div class="withdraw-section">
-      <h3>Withdraw Earnings</h3>
-      <p>Fee: 1 TON (paid to our wallet)</p>
-      <input type="text" id="wallet-address" placeholder="Your TON wallet address">
-      <button id="withdraw-btn" class="action-btn">Withdraw Now</button>
-    </div>
-  </div>
+                    <div class="stat-card" id="packageInfo" style="display: none;">
+                        <h3>📦 Active Package</h3>
+                        <div id="packageDetails"></div>
+                    </div>
 
-  <div id="referrals" class="tab-content">
-    <h2>Your Referrals</h2>
-    <div class="referral-stats">
-      <p>Total Referrals: <span id="referral-count">0</span></p>
-      <p>Earned from Referrals: <span id="referral-earnings">0</span> points</p>
-    </div>
-    
-    <div class="referral-link-box">
-      <p>Your referral link:</p>
-      <div class="link-container">
-        <input type="text" id="ref-link" readonly>
-        <button id="copy-link">Copy</button>
-      </div>
-    </div>
-    
-    <div class="referral-list">
-      <h3>Recent Referrals</h3>
-      <ul id="referrals-list"></ul>
-    </div>
-  </div>
+                    <div class="withdrawal-section">
+                        <h3>💰 Withdraw TON</h3>
+                        <div class="input-group">
+                            <label>Amount (TON)</label>
+                            <input type="number" id="withdrawAmount" placeholder="Enter amount to withdraw" step="0.01" min="0.01">
+                        </div>
+                        <div class="input-group">
+                            <label>TON Wallet Address</label>
+                            <input type="text" id="walletAddress" placeholder="Enter your TON wallet address">
+                        </div>
+                        <p style="font-size: 12px; opacity: 0.8; margin: 10px 0;">
+                            ⚠️ Withdrawal fee: 1 TON | Minimum: 0.01 TON
+                        </p>
+                        <button class="withdraw-btn" onclick="withdraw()">Withdraw TON</button>
+                    </div>
+                </div>
+            </div>
 
-  <div id="packages" class="tab-content">
-    <h2>Boost Your Earnings</h2>
-    
-    <div class="package-card" data-package="5">
-      <h3>$5 Package</h3>
-      <ul>
-        <li>0.2 points per tap</li>
-        <li>Earn up to $10</li>
-        <li>Cost: <span class="ton-cost">1.49</span> TON</li>
-      </ul>
-      <button class="buy-btn">Buy Package</button>
-    </div>
+            <!-- Referrals Tab -->
+            <div id="referrals" class="tab-content">
+                <div class="loading" id="referralsLoading">
+                    <div class="spinner"></div>
+                    <p>Loading referrals...</p>
+                </div>
+                
+                <div id="referralsContent" style="display: none;">
+                    <h3>👥 Invite Friends</h3>
+                    <p>Earn 100 points for each friend you refer!</p>
+                    
+                    <div class="referral-link">
+                        <strong>Your Referral Link:</strong>
+                        <div id="referralLink" style="margin: 10px 0; font-size: 12px;"></div>
+                        <button class="copy-btn" onclick="copyReferralLink()">📋 Copy Link</button>
+                    </div>
 
-    <div class="package-card" data-package="10">
-      <h3>$10 Package</h3>
-      <ul>
-        <li>0.25 points per tap</li>
-        <li>Earn up to $20</li>
-        <li>Cost: <span class="ton-cost">2.98</span> TON</li>
-      </ul>
-      <button class="buy-btn">Buy Package</button>
-    </div>
-
-    <div class="package-card" data-package="50">
-      <h3>$50 Package</h3>
-      <ul>
-        <li>0.5 points per tap</li>
-        <li>Earn up to $100</li>
-        <li>Cost: <span class="ton-cost">15.11</span> TON</li>
-      </ul>
-      <button class="buy-btn">Buy Package</button>
-    </div>
-
-    <div class="package-card" data-package="100">
-      <h3>$100 Package</h3>
-      <ul>
-        <li>1 point per tap</li>
-        <li>Earn up to $200</li>
-        <li>Cost: <span class="ton-cost">30.21</span> TON</li>
-      </ul>
-      <button class="buy-btn">Buy Package</button>
-    </div>
-
-    <div class="package-card" data-package="unlimited">
-      <h3>Unlimited Package ($500)</h3>
-      <ul>
-        <li>1 point per tap</li>
-        <li>No daily tap limit</li>
-        <li>Lifetime access</li>
-        <li>Cost: <span class="ton-cost">151.06</span> TON</li>
-      </ul>
-      <button class="buy-btn">Buy Package</button>
-    </div>
-  </div>
-
-  <script src="app.js"></script>
-</body>
-</html>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-value" id="totalReferrals">0</div>
+                            <div class="stat-label">Total Referrals</div>
