@@ -2,39 +2,128 @@
 <html>
 <head>
   <title>TON Tap App</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="style.css">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <script src="app.js" defer></script>
 </head>
 <body>
-  <div class="tab">
+  <div class="tabs">
     <button class="tab-btn active" data-tab="main">Main</button>
     <button class="tab-btn" data-tab="referrals">Referrals</button>
     <button class="tab-btn" data-tab="packages">Packages</button>
   </div>
 
   <div id="main" class="tab-content active">
-    <h1>Your Points: <span id="points">0</span></h1>
-    <p>1,000 points = $1</p>
-    <button id="tap-btn">TAP TO EARN</button>
-    <p>Taps left: <span id="taps-left">100</span>/day</p>
-    <button id="withdraw-btn">Withdraw TON</button>
+    <div class="balance-card">
+      <h2>Your Balance</h2>
+      <div class="balance-values">
+        <div class="balance-item">
+          <span class="label">Points:</span>
+          <span id="points" class="value">0</span>
+        </div>
+        <div class="balance-item">
+          <span class="label">USD Value:</span>
+          <span id="usd-value" class="value">$0.00</span>
+        </div>
+        <div class="balance-item">
+          <span class="label">TON Value:</span>
+          <span id="ton-value" class="value">0 TON</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="tap-area">
+      <button id="tap-btn" class="tap-button">TAP TO EARN</button>
+      <div class="tap-info">
+        <p>Taps left today: <span id="taps-left">100</span>/100</p>
+        <p>Current rate: <span id="tap-rate">0.05</span> points/tap</p>
+      </div>
+    </div>
+
+    <div class="withdraw-section">
+      <h3>Withdraw Earnings</h3>
+      <p>Fee: 1 TON (paid to our wallet)</p>
+      <input type="text" id="wallet-address" placeholder="Your TON wallet address">
+      <button id="withdraw-btn" class="action-btn">Withdraw Now</button>
+    </div>
   </div>
 
   <div id="referrals" class="tab-content">
     <h2>Your Referrals</h2>
-    <ul id="referral-list"></ul>
+    <div class="referral-stats">
+      <p>Total Referrals: <span id="referral-count">0</span></p>
+      <p>Earned from Referrals: <span id="referral-earnings">0</span> points</p>
+    </div>
+    
+    <div class="referral-link-box">
+      <p>Your referral link:</p>
+      <div class="link-container">
+        <input type="text" id="ref-link" readonly>
+        <button id="copy-link">Copy</button>
+      </div>
+    </div>
+    
+    <div class="referral-list">
+      <h3>Recent Referrals</h3>
+      <ul id="referrals-list"></ul>
+    </div>
   </div>
 
   <div id="packages" class="tab-content">
-    <h2>Buy Packages</h2>
-    <div class="package" data-package="5">
+    <h2>Boost Your Earnings</h2>
+    
+    <div class="package-card" data-package="5">
       <h3>$5 Package</h3>
-      <p>Earn $10 max</p>
-      <p>0.2 points/tap</p>
-      <button class="buy-btn">Buy: 1.49 TON</button>
+      <ul>
+        <li>0.2 points per tap</li>
+        <li>Earn up to $10</li>
+        <li>Cost: <span class="ton-cost">1.49</span> TON</li>
+      </ul>
+      <button class="buy-btn">Buy Package</button>
     </div>
-    <!-- Add other packages similarly -->
+
+    <div class="package-card" data-package="10">
+      <h3>$10 Package</h3>
+      <ul>
+        <li>0.25 points per tap</li>
+        <li>Earn up to $20</li>
+        <li>Cost: <span class="ton-cost">2.98</span> TON</li>
+      </ul>
+      <button class="buy-btn">Buy Package</button>
+    </div>
+
+    <div class="package-card" data-package="50">
+      <h3>$50 Package</h3>
+      <ul>
+        <li>0.5 points per tap</li>
+        <li>Earn up to $100</li>
+        <li>Cost: <span class="ton-cost">15.11</span> TON</li>
+      </ul>
+      <button class="buy-btn">Buy Package</button>
+    </div>
+
+    <div class="package-card" data-package="100">
+      <h3>$100 Package</h3>
+      <ul>
+        <li>1 point per tap</li>
+        <li>Earn up to $200</li>
+        <li>Cost: <span class="ton-cost">30.21</span> TON</li>
+      </ul>
+      <button class="buy-btn">Buy Package</button>
+    </div>
+
+    <div class="package-card" data-package="unlimited">
+      <h3>Unlimited Package ($500)</h3>
+      <ul>
+        <li>1 point per tap</li>
+        <li>No daily tap limit</li>
+        <li>Lifetime access</li>
+        <li>Cost: <span class="ton-cost">151.06</span> TON</li>
+      </ul>
+      <button class="buy-btn">Buy Package</button>
+    </div>
   </div>
+
+  <script src="app.js"></script>
 </body>
 </html>
