@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Panel - Tap to Earn</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.7/dist/umd/supabase.js"></script>
     <style>
         * {
             margin: 0;
@@ -97,11 +98,12 @@
             width: 100%;
             border-collapse: collapse;
             margin-top: 15px;
+            font-size: 12px;
         }
         
         .user-table th,
         .user-table td {
-            padding: 12px;
+            padding: 8px;
             text-align: left;
             border-bottom: 1px solid rgba(255, 255, 255, 0.2);
         }
@@ -112,13 +114,14 @@
         }
         
         .btn {
-            padding: 10px 15px;
+            padding: 8px 12px;
             border: none;
-            border-radius: 8px;
+            border-radius: 6px;
             cursor: pointer;
             font-weight: bold;
-            margin: 5px;
+            margin: 2px;
             transition: all 0.3s ease;
+            font-size: 11px;
         }
         
         .btn-danger {
@@ -230,6 +233,24 @@
             font-family: inherit;
         }
 
+        .error-message {
+            background: rgba(255, 71, 87, 0.2);
+            border: 1px solid #ff4757;
+            color: #ff4757;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+
+        .success-message {
+            background: rgba(46, 213, 115, 0.2);
+            border: 1px solid #2ed573;
+            color: #2ed573;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+
         @media (max-width: 768px) {
             .stats-grid {
                 grid-template-columns: repeat(2, 1fr);
@@ -237,15 +258,6 @@
             
             .input-group {
                 flex-direction: column;
-            }
-            
-            .user-table {
-                font-size: 12px;
-            }
-            
-            .user-table th,
-            .user-table td {
-                padding: 8px;
             }
         }
     </style>
@@ -256,7 +268,7 @@
         <div id="loading" class="loading">
             <div class="spinner"></div>
             <h2>Loading Admin Panel...</h2>
-            <p>Verifying admin access...</p>
+            <p>Connecting to database...</p>
         </div>
 
         <!-- Access Denied -->
@@ -267,11 +279,19 @@
             <p>Contact the administrator if you believe this is an error.</p>
         </div>
 
+        <!-- Database Error -->
+        <div id="databaseError" class="access-denied" style="display: none;">
+            <h1>⚠️</h1>
+            <h2>Database Connection Error</h2>
+            <p>Please configure your Supabase credentials.</p>
+            <div class="error-message" id="errorDetails"></div>
+        </div>
+
         <!-- Admin Panel -->
         <div id="adminPanel" class="admin-container" style="display: none;">
             <div class="header">
                 <div class="admin-title">🎯 Admin Control Panel</div>
-                <div class="admin-subtitle">Manage your Tap-to-Earn Mini App</div>
+                <div class="admin-subtitle">Connected to Supabase Database</div>
             </div>
 
             <!-- Stats Overview -->
@@ -307,34 +327,42 @@
                 <div class="section-title">👥 User Management</div>
                 
                 <div class="input-group">
-                    <input type="text" class="form-input" id="searchUser" placeholder="Search by username or ID">
+                    <input type="text" class="form-input" id="searchUser" placeholder="Search by username or Telegram ID">
                     <button class="btn btn-primary" onclick="searchUsers()">🔍 Search</button>
                     <button class="btn btn-success" onclick="loadAllUsers()">📋 Show All Users</button>
                 </div>
 
                 <div class="input-group">
-                    <input type="number" class="form-input" id="userIdInput" placeholder="User ID">
-                    <input type="number" class="form-input" id="coinsToAdd" placeholder="Coins to add">
+                    <input type="number" class="form-input" id="userIdInput" placeholder="Telegram User ID">
+                    <input type="number" class="form-input" id="coinsToAdd" placeholder="Coins to add" step="0.01">
                     <button class="btn btn-success" onclick="addCoins()">💰 Add Coins</button>
-                    <button class="btn btn-danger" onclick="banUser()">🚫 Ban User</button>
+                    <button class="btn btn-danger" onclick="toggleUserBan()">🚫 Ban/Unban User</button>
                 </div>
 
-                <table class="user-table" id="usersTable">
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Username</th>
-                            <th>Balance</th>
-                            <th>Packages</th>
-                            <th>Referrals</th>
-                            <th>Status</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="usersTableBody">
-                        <!-- Users will be loaded here -->
-                    </tbody>
-                </table>
+                <div style="overflow-x: auto;">
+                    <table class="user-table" id="usersTable">
+                        <thead>
+                            <tr>
+                                <th>Telegram ID</th>
+                                <th>Username</th>
+                                <th>Balance</th>
+                                <th>Total Taps</th>
+                                <th>Level</th>
+                                <th>Referrals</th>
+                                <th>Status</th>
+                                <th>Joined</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="usersTableBody">
+                            <tr>
+                                <td colspan="9" style="text-align: center; padding: 20px;">
+                                    Click "Show All Users" to load data
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             <!-- Withdrawal Management -->
@@ -342,7 +370,7 @@
                 <div class="section-title">💳 Withdrawal Management</div>
                 
                 <div id="withdrawalsList">
-                    <!-- Pending withdrawals will be shown here -->
+                    <p style="text-align: center; opacity: 0.7;">Click "Refresh Withdrawals" to load data</p>
                 </div>
 
                 <div class="input-group">
@@ -356,86 +384,51 @@
                 <div class="section-title">📦 Package Configuration</div>
                 
                 <div class="package-config" id="packageConfig">
-                    <!-- Package configurations will be loaded here -->
+                    <p style="text-align: center; opacity: 0.7;">Loading packages...</p>
                 </div>
 
                 <div class="input-group">
-                    <input type="number" class="form-input" id="newPackagePrice" placeholder="Package Price ($)">
-                    <input type="number" class="form-input" id="newPackageProfit" placeholder="Max Profit ($)">
-                    <input type="number" class="form-input" id="newPackageDays" placeholder="Duration (days)" value="30">
+                    <input type="text" class="form-input" id="newPackageName" placeholder="Package Name">
+                    <input type="number" class="form-input" id="newPackagePrice" placeholder="Price ($)" step="0.01">
+                    <input type="number" class="form-input" id="newPackageProfit" placeholder="Max Profit ($)" step="0.01">
+                    <input type="number" class="form-input" id="newPackageTapLimit" placeholder="Daily Tap Limit">
                     <button class="btn btn-success" onclick="addNewPackage()">➕ Add Package</button>
                 </div>
             </div>
 
-            <!-- Broadcast Messages -->
+            <!-- Database Status -->
             <div class="section">
-                <div class="section-title">📢 Broadcast Message</div>
-                
-                <div class="broadcast-section">
-                    <textarea class="broadcast-textarea" id="broadcastMessage" placeholder="Enter your message to send to all users..."></textarea>
-                    
-                    <div class="input-group" style="margin-top: 15px;">
-                        <button class="btn btn-primary" onclick="sendBroadcast()">📤 Send to All Users</button>
-                        <button class="btn btn-success" onclick="testBroadcast()">🧪 Test Message</button>
-                    </div>
+                <div class="section-title">📊 Database Status</div>
+                <div id="databaseStatus">
+                    <p>🔄 Checking connection...</p>
                 </div>
-            </div>
-
-            <!-- Anti-Cheat Monitoring -->
-            <div class="section">
-                <div class="section-title">🛡️ Anti-Cheat Monitoring</div>
-                
                 <div class="input-group">
-                    <input type="number" class="form-input" id="maxTapsPerSecond" placeholder="Max taps/second" value="10">
-                    <button class="btn btn-primary" onclick="updateAntiCheat()">🔧 Update Settings</button>
-                    <button class="btn btn-danger" onclick="findSuspiciousUsers()">🔍 Find Suspicious Users</button>
+                    <button class="btn btn-primary" onclick="testConnection()">🧪 Test Connection</button>
+                    <button class="btn btn-success" onclick="refreshAllData()">🔄 Refresh All Data</button>
                 </div>
-
-                <table class="user-table" id="suspiciousUsersTable" style="display: none;">
-                    <thead>
-                        <tr>
-                            <th>User ID</th>
-                            <th>Username</th>
-                            <th>Suspicious Activity</th>
-                            <th>Taps/Minute</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody id="suspiciousUsersBody">
-                        <!-- Suspicious users will be shown here -->
-                    </tbody>
-                </table>
             </div>
         </div>
     </div>
 
     <script>
-        // Your Telegram ID (CHANGE THIS TO YOUR ACTUAL TELEGRAM ID)
-        const ADMIN_TELEGRAM_ID = 7538805953; // 🔥 REPLACE WITH YOUR TELEGRAM ID!
+        // 🔥 YOUR SUPABASE CREDENTIALS (CONFIGURED)
+        const SUPABASE_URL = 'https://arjkzpbhinpqensoqqod.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFyamt6cGJoaW5wcWVuc29xcW9kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNjAwMTUsImV4cCI6MjA3MDYzNjAxNX0.zo5kS1J5Lv-FiRSJbt0hhaawUGB-6gNcZCgl74B7WBo';
+        
+        // Your Telegram ID (ALREADY SET)
+        const ADMIN_TELEGRAM_ID = 7538805953;
+        
+        // Initialize Supabase client
+        let supabase;
+        let isSupabaseConnected = false;
         
         // Initialize Telegram Web App
         const tg = window.Telegram?.WebApp;
         
-        // Sample data (replace with real API calls)
-        let userData = {
-            users: [
-                { id: 1, username: "user1", balance: 150.50, packages: 2, referrals: 5, status: "active" },
-                { id: 2, username: "user2", balance: 89.25, packages: 1, referrals: 2, status: "active" },
-                { id: 3, username: "user3", balance: 245.00, packages: 3, referrals: 8, status: "banned" }
-            ],
-            withdrawals: [
-                { id: 1, userId: 1, username: "user1", amount: 25.50, wallet: "UQA7X...", status: "pending" },
-                { id: 2, userId: 2, username: "user2", amount: 15.00, wallet: "UQB8Y...", status: "pending" }
-            ],
-            packages: [
-                { id: 1, price: 5, profit: 10, duration: 30, active: true },
-                { id: 2, price: 25, profit: 60, duration: 30, active: true },
-                { id: 3, price: 100, profit: 250, duration: 30, active: true }
-            ]
-        };
-
         // Initialize app
         document.addEventListener('DOMContentLoaded', function() {
+            initializeSupabase();
+            
             if (tg) {
                 tg.ready();
                 checkAdminAccess();
@@ -445,15 +438,40 @@
             }
         });
 
+        function initializeSupabase() {
+            try {
+                if (SUPABASE_URL === 'YOUR_SUPABASE_URL_HERE' || SUPABASE_ANON_KEY === 'YOUR_SUPABASE_ANON_KEY_HERE') {
+                    throw new Error('Supabase credentials not configured');
+                }
+                
+                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                isSupabaseConnected = true;
+                console.log('✅ Supabase connected successfully');
+            } catch (error) {
+                console.error('❌ Supabase connection failed:', error);
+                showDatabaseError(error.message);
+            }
+        }
+
+        function showDatabaseError(error) {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('databaseError').style.display = 'block';
+            document.getElementById('errorDetails').textContent = error;
+        }
+
         function checkAdminAccess() {
             const loading = document.getElementById('loading');
             const accessDenied = document.getElementById('accessDenied');
             const adminPanel = document.getElementById('adminPanel');
 
+            if (!isSupabaseConnected) {
+                return; // Database error already shown
+            }
+
             // Get user data from Telegram
             const telegramUser = tg?.initDataUnsafe?.user;
             
-            // For testing purposes, you can comment out the real check and use this:
+            // For testing purposes (comment out when deploying)
             // const isAdmin = true;
             
             const isAdmin = telegramUser && telegramUser.id === ADMIN_TELEGRAM_ID;
@@ -467,41 +485,115 @@
                 } else {
                     accessDenied.style.display = 'block';
                 }
-            }, 2000);
+            }, 1500);
         }
 
-        function loadAdminData() {
-            // Load statistics
-            document.getElementById('totalUsers').textContent = userData.users.length;
-            document.getElementById('totalRevenue').textContent = '$' + (userData.users.length * 75).toFixed(2);
-            document.getElementById('totalTaps').textContent = (userData.users.length * 1500).toLocaleString();
-            document.getElementById('activePackages').textContent = userData.users.reduce((sum, user) => sum + user.packages, 0);
-            document.getElementById('pendingWithdrawals').textContent = userData.withdrawals.filter(w => w.status === 'pending').length;
-            document.getElementById('totalReferrals').textContent = userData.users.reduce((sum, user) => sum + user.referrals, 0);
-
-            // Load users
-            loadAllUsers();
-            loadPendingWithdrawals();
-            loadPackageConfig();
+        async function loadAdminData() {
+            try {
+                await Promise.all([
+                    loadStats(),
+                    loadPackageConfig(),
+                    testConnection()
+                ]);
+            } catch (error) {
+                console.error('Error loading admin data:', error);
+                showMessage('Failed to load admin data: ' + error.message, 'error');
+            }
         }
 
-        function loadAllUsers() {
+        async function loadStats() {
+            try {
+                // Get total users
+                const { data: users, error: usersError } = await supabase
+                    .from('users')
+                    .select('*');
+                
+                if (usersError) throw usersError;
+
+                // Get total revenue from packages
+                const { data: packages, error: packagesError } = await supabase
+                    .from('user_packages')
+                    .select(`
+                        *,
+                        packages (price)
+                    `);
+                
+                if (packagesError) throw packagesError;
+
+                // Get withdrawals
+                const { data: withdrawals, error: withdrawalsError } = await supabase
+                    .from('withdrawals')
+                    .select('*');
+                
+                if (withdrawalsError) throw withdrawalsError;
+
+                // Update stats
+                document.getElementById('totalUsers').textContent = users?.length || 0;
+                
+                const totalRevenue = packages?.reduce((sum, pkg) => sum + (pkg.packages?.price || 0), 0) || 0;
+                document.getElementById('totalRevenue').textContent = '$' + totalRevenue.toFixed(2);
+                
+                const totalTaps = users?.reduce((sum, user) => sum + (user.total_taps || 0), 0) || 0;
+                document.getElementById('totalTaps').textContent = totalTaps.toLocaleString();
+                
+                const activePackages = packages?.filter(pkg => pkg.is_active).length || 0;
+                document.getElementById('activePackages').textContent = activePackages;
+                
+                const pendingWithdrawals = withdrawals?.filter(w => w.status === 'pending').length || 0;
+                document.getElementById('pendingWithdrawals').textContent = pendingWithdrawals;
+                
+                const totalReferrals = users?.reduce((sum, user) => sum + (user.referral_count || 0), 0) || 0;
+                document.getElementById('totalReferrals').textContent = totalReferrals;
+
+            } catch (error) {
+                console.error('Error loading stats:', error);
+                showMessage('Failed to load statistics', 'error');
+            }
+        }
+
+        async function loadAllUsers() {
+            try {
+                showMessage('Loading users...', 'info');
+                
+                const { data: users, error } = await supabase
+                    .from('users')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+                
+                if (error) throw error;
+
+                displayUsers(users || []);
+                
+            } catch (error) {
+                console.error('Error loading users:', error);
+                showMessage('Failed to load users: ' + error.message, 'error');
+            }
+        }
+
+        function displayUsers(users) {
             const tbody = document.getElementById('usersTableBody');
             tbody.innerHTML = '';
 
-            userData.users.forEach(user => {
+            if (users.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px;">No users found</td></tr>';
+                return;
+            }
+
+            users.forEach(user => {
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td>${user.id}</td>
-                    <td>${user.username}</td>
-                    <td>$${user.balance.toFixed(2)}</td>
-                    <td>${user.packages}</td>
-                    <td>${user.referrals}</td>
-                    <td><span style="color: ${user.status === 'active' ? '#2ed573' : '#ff4757'}">${user.status.toUpperCase()}</span></td>
+                    <td>${user.telegram_id}</td>
+                    <td>${user.username || 'N/A'}</td>
+                    <td>${parseFloat(user.balance || 0).toFixed(2)}</td>
+                    <td>${user.total_taps || 0}</td>
+                    <td>${user.level || 1}</td>
+                    <td>${user.referral_count || 0}</td>
+                    <td><span style="color: ${user.is_banned ? '#ff4757' : '#2ed573'}">${user.is_banned ? 'BANNED' : 'ACTIVE'}</span></td>
+                    <td>${new Date(user.created_at).toLocaleDateString()}</td>
                     <td>
-                        <button class="btn btn-primary" onclick="viewUserDetails(${user.id})">👁️ View</button>
-                        <button class="btn btn-${user.status === 'active' ? 'danger' : 'success'}" onclick="toggleUserStatus(${user.id})">
-                            ${user.status === 'active' ? '🚫 Ban' : '✅ Unban'}
+                        <button class="btn btn-primary" onclick="viewUserDetails(${user.telegram_id})">👁️</button>
+                        <button class="btn btn-${user.is_banned ? 'success' : 'danger'}" onclick="toggleUserBan(${user.telegram_id})">
+                            ${user.is_banned ? '✅' : '🚫'}
                         </button>
                     </td>
                 `;
@@ -509,26 +601,214 @@
             });
         }
 
-        function loadPendingWithdrawals() {
+        async function searchUsers() {
+            try {
+                const searchTerm = document.getElementById('searchUser').value.trim();
+                
+                if (!searchTerm) {
+                    await loadAllUsers();
+                    return;
+                }
+
+                showMessage('Searching users...', 'info');
+                
+                const { data: users, error } = await supabase
+                    .from('users')
+                    .select('*')
+                    .or(`username.ilike.%${searchTerm}%,telegram_id.eq.${searchTerm}`)
+                    .order('created_at', { ascending: false });
+                
+                if (error) throw error;
+
+                displayUsers(users || []);
+                
+            } catch (error) {
+                console.error('Error searching users:', error);
+                showMessage('Search failed: ' + error.message, 'error');
+            }
+        }
+
+        async function addCoins() {
+            try {
+                const userId = document.getElementById('userIdInput').value;
+                const coinsToAdd = parseFloat(document.getElementById('coinsToAdd').value);
+                
+                if (!userId || !coinsToAdd || coinsToAdd <= 0) {
+                    showMessage('Please enter valid User ID and positive amount!', 'error');
+                    return;
+                }
+
+                showMessage('Adding coins...', 'info');
+
+                // First get current balance
+                const { data: user, error: getUserError } = await supabase
+                    .from('users')
+                    .select('balance, username')
+                    .eq('telegram_id', userId)
+                    .single();
+
+                if (getUserError || !user) {
+                    throw new Error('User not found');
+                }
+
+                // Update balance
+                const newBalance = parseFloat(user.balance || 0) + coinsToAdd;
+                
+                const { error: updateError } = await supabase
+                    .from('users')
+                    .update({ 
+                        balance: newBalance,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('telegram_id', userId);
+
+                if (updateError) throw updateError;
+
+                // Log the transaction
+                await supabase
+                    .from('transactions')
+                    .insert({
+                        user_id: userId,
+                        type: 'admin_add',
+                        amount: coinsToAdd,
+                        description: `Admin added ${coinsToAdd} coins`
+                    });
+
+                // Log admin action
+                await supabase
+                    .from('admin_logs')
+                    .insert({
+                        admin_telegram_id: ADMIN_TELEGRAM_ID,
+                        action: 'add_coins',
+                        target_user_id: userId,
+                        details: {
+                            amount: coinsToAdd,
+                            old_balance: user.balance,
+                            new_balance: newBalance
+                        }
+                    });
+
+                showMessage(`✅ Added ${coinsToAdd} to ${user.username || userId}'s account!`, 'success');
+                
+                // Clear inputs
+                document.getElementById('userIdInput').value = '';
+                document.getElementById('coinsToAdd').value = '';
+                
+                // Refresh user list
+                await loadAllUsers();
+                
+            } catch (error) {
+                console.error('Error adding coins:', error);
+                showMessage('Failed to add coins: ' + error.message, 'error');
+            }
+        }
+
+        async function toggleUserBan(userTelegramId = null) {
+            try {
+                const userId = userTelegramId || document.getElementById('userIdInput').value;
+                
+                if (!userId) {
+                    showMessage('Please enter User ID!', 'error');
+                    return;
+                }
+
+                showMessage('Updating user status...', 'info');
+
+                // Get current user status
+                const { data: user, error: getUserError } = await supabase
+                    .from('users')
+                    .select('is_banned, username')
+                    .eq('telegram_id', userId)
+                    .single();
+
+                if (getUserError || !user) {
+                    throw new Error('User not found');
+                }
+
+                const newStatus = !user.is_banned;
+                
+                // Update user status
+                const { error: updateError } = await supabase
+                    .from('users')
+                    .update({ 
+                        is_banned: newStatus,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('telegram_id', userId);
+
+                if (updateError) throw updateError;
+
+                // Log admin action
+                await supabase
+                    .from('admin_logs')
+                    .insert({
+                        admin_telegram_id: ADMIN_TELEGRAM_ID,
+                        action: newStatus ? 'ban_user' : 'unban_user',
+                        target_user_id: userId,
+                        details: {
+                            previous_status: user.is_banned,
+                            new_status: newStatus
+                        }
+                    });
+
+                showMessage(`✅ User ${user.username || userId} has been ${newStatus ? 'banned' : 'unbanned'}!`, 'success');
+                
+                // Clear input if used
+                if (!userTelegramId) {
+                    document.getElementById('userIdInput').value = '';
+                }
+                
+                // Refresh user list
+                await loadAllUsers();
+                
+            } catch (error) {
+                console.error('Error toggling user ban:', error);
+                showMessage('Failed to update user status: ' + error.message, 'error');
+            }
+        }
+
+        async function loadPendingWithdrawals() {
+            try {
+                showMessage('Loading withdrawals...', 'info');
+                
+                const { data: withdrawals, error } = await supabase
+                    .from('withdrawals')
+                    .select(`
+                        *,
+                        users!withdrawals_user_id_fkey (username)
+                    `)
+                    .eq('status', 'pending')
+                    .order('request_date', { ascending: false });
+                
+                if (error) throw error;
+
+                displayWithdrawals(withdrawals || []);
+                
+            } catch (error) {
+                console.error('Error loading withdrawals:', error);
+                showMessage('Failed to load withdrawals: ' + error.message, 'error');
+            }
+        }
+
+        function displayWithdrawals(withdrawals) {
             const container = document.getElementById('withdrawalsList');
             container.innerHTML = '';
 
-            const pendingWithdrawals = userData.withdrawals.filter(w => w.status === 'pending');
-
-            if (pendingWithdrawals.length === 0) {
+            if (withdrawals.length === 0) {
                 container.innerHTML = '<p style="text-align: center; opacity: 0.7;">No pending withdrawals</p>';
                 return;
             }
 
-            pendingWithdrawals.forEach(withdrawal => {
+            withdrawals.forEach(withdrawal => {
                 const card = document.createElement('div');
                 card.className = 'withdrawal-card';
                 card.innerHTML = `
                     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
                         <div>
-                            <strong>${withdrawal.username}</strong> (ID: ${withdrawal.userId})<br>
-                            Amount: <strong>$${withdrawal.amount}</strong><br>
-                            Wallet: <code>${withdrawal.wallet}</code>
+                            <strong>${withdrawal.users?.username || 'Unknown'}</strong> (ID: ${withdrawal.user_id})<br>
+                            Amount: <strong>${parseFloat(withdrawal.amount).toFixed(2)}</strong><br>
+                            Wallet: <code style="word-break: break-all;">${withdrawal.wallet_address}</code><br>
+                            <small>Requested: ${new Date(withdrawal.request_date).toLocaleString()}</small>
                         </div>
                         <div>
                             <button class="btn btn-success" onclick="approveWithdrawal(${withdrawal.id})">✅ Approve</button>
@@ -540,23 +820,124 @@
             });
         }
 
-        function loadPackageConfig() {
+        async function approveWithdrawal(withdrawalId) {
+            try {
+                if (!confirm('Are you sure you want to approve this withdrawal?')) return;
+
+                showMessage('Approving withdrawal...', 'info');
+                
+                const { error } = await supabase
+                    .from('withdrawals')
+                    .update({ 
+                        status: 'approved',
+                        processed_date: new Date().toISOString()
+                    })
+                    .eq('id', withdrawalId);
+
+                if (error) throw error;
+
+                showMessage('✅ Withdrawal approved successfully!', 'success');
+                await loadPendingWithdrawals();
+                
+            } catch (error) {
+                console.error('Error approving withdrawal:', error);
+                showMessage('Failed to approve withdrawal: ' + error.message, 'error');
+            }
+        }
+
+        async function rejectWithdrawal(withdrawalId) {
+            try {
+                const reason = prompt('Reason for rejection (optional):');
+                
+                if (!confirm('Are you sure you want to reject this withdrawal?')) return;
+
+                showMessage('Rejecting withdrawal...', 'info');
+                
+                const { error } = await supabase
+                    .from('withdrawals')
+                    .update({ 
+                        status: 'rejected',
+                        processed_date: new Date().toISOString(),
+                        admin_notes: reason
+                    })
+                    .eq('id', withdrawalId);
+
+                if (error) throw error;
+
+                showMessage('❌ Withdrawal rejected successfully!', 'success');
+                await loadPendingWithdrawals();
+                
+            } catch (error) {
+                console.error('Error rejecting withdrawal:', error);
+                showMessage('Failed to reject withdrawal: ' + error.message, 'error');
+            }
+        }
+
+        async function approveAllWithdrawals() {
+            try {
+                if (!confirm('Are you sure you want to approve ALL pending withdrawals?')) return;
+
+                showMessage('Approving all withdrawals...', 'info');
+                
+                const { error } = await supabase
+                    .from('withdrawals')
+                    .update({ 
+                        status: 'approved',
+                        processed_date: new Date().toISOString()
+                    })
+                    .eq('status', 'pending');
+
+                if (error) throw error;
+
+                showMessage('✅ All withdrawals approved!', 'success');
+                await loadPendingWithdrawals();
+                
+            } catch (error) {
+                console.error('Error approving all withdrawals:', error);
+                showMessage('Failed to approve withdrawals: ' + error.message, 'error');
+            }
+        }
+
+        async function loadPackageConfig() {
+            try {
+                const { data: packages, error } = await supabase
+                    .from('packages')
+                    .select('*')
+                    .order('price', { ascending: true });
+                
+                if (error) throw error;
+
+                displayPackages(packages || []);
+                
+            } catch (error) {
+                console.error('Error loading packages:', error);
+                showMessage('Failed to load packages: ' + error.message, 'error');
+            }
+        }
+
+        function displayPackages(packages) {
             const container = document.getElementById('packageConfig');
             container.innerHTML = '';
 
-            userData.packages.forEach(pkg => {
+            if (packages.length === 0) {
+                container.innerHTML = '<p style="text-align: center; opacity: 0.7;">No packages found</p>';
+                return;
+            }
+
+            packages.forEach(pkg => {
                 const card = document.createElement('div');
                 card.className = 'package-card';
                 card.innerHTML = `
-                    <h4>Package #${pkg.id}</h4>
-                    <p><strong>Price:</strong> $${pkg.price}</p>
-                    <p><strong>Max Profit:</strong> $${pkg.profit}</p>
-                    <p><strong>Duration:</strong> ${pkg.duration} days</p>
-                    <p><strong>Status:</strong> <span style="color: ${pkg.active ? '#2ed573' : '#ff4757'}">${pkg.active ? 'Active' : 'Inactive'}</span></p>
+                    <h4>${pkg.name}</h4>
+                    <p><strong>Price:</strong> ${parseFloat(pkg.price).toFixed(2)}</p>
+                    <p><strong>Max Profit:</strong> ${parseFloat(pkg.max_profit).toFixed(2)}</p>
+                    <p><strong>Duration:</strong> ${pkg.duration_days} days</p>
+                    <p><strong>Daily Tap Limit:</strong> ${pkg.daily_tap_limit}</p>
+                    <p><strong>Status:</strong> <span style="color: ${pkg.is_active ? '#2ed573' : '#ff4757'}">${pkg.is_active ? 'Active' : 'Inactive'}</span></p>
                     <div style="margin-top: 15px;">
                         <button class="btn btn-primary" onclick="editPackage(${pkg.id})">✏️ Edit</button>
-                        <button class="btn btn-${pkg.active ? 'danger' : 'success'}" onclick="togglePackage(${pkg.id})">
-                            ${pkg.active ? '🚫 Disable' : '✅ Enable'}
+                        <button class="btn btn-${pkg.is_active ? 'danger' : 'success'}" onclick="togglePackage(${pkg.id})">
+                            ${pkg.is_active ? '🚫 Disable' : '✅ Enable'}
                         </button>
                     </div>
                 `;
@@ -564,326 +945,220 @@
             });
         }
 
-        // Admin Functions
-        function searchUsers() {
-            const searchTerm = document.getElementById('searchUser').value.toLowerCase();
-            const filteredUsers = userData.users.filter(user => 
-                user.username.toLowerCase().includes(searchTerm) || 
-                user.id.toString().includes(searchTerm)
-            );
-            
-            displayUsers(filteredUsers);
-        }
+        async function addNewPackage() {
+            try {
+                const name = document.getElementById('newPackageName').value.trim();
+                const price = parseFloat(document.getElementById('newPackagePrice').value);
+                const profit = parseFloat(document.getElementById('newPackageProfit').value);
+                const tapLimit = parseInt(document.getElementById('newPackageTapLimit').value);
 
-        function displayUsers(users) {
-            const tbody = document.getElementById('usersTableBody');
-            tbody.innerHTML = '';
+                if (!name || !price || !profit || !tapLimit) {
+                    showMessage('Please fill in all package details!', 'error');
+                    return;
+                }
 
-            users.forEach(user => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${user.id}</td>
-                    <td>${user.username}</td>
-                    <td>$${user.balance.toFixed(2)}</td>
-                    <td>${user.packages}</td>
-                    <td>${user.referrals}</td>
-                    <td><span style="color: ${user.status === 'active' ? '#2ed573' : '#ff4757'}">${user.status.toUpperCase()}</span></td>
-                    <td>
-                        <button class="btn btn-primary" onclick="viewUserDetails(${user.id})">👁️ View</button>
-                        <button class="btn btn-${user.status === 'active' ? 'danger' : 'success'}" onclick="toggleUserStatus(${user.id})">
-                            ${user.status === 'active' ? '🚫 Ban' : '✅ Unban'}
-                        </button>
-                    </td>
-                `;
-                tbody.appendChild(row);
-            });
-        }
+                showMessage('Creating package...', 'info');
 
-        function addCoins() {
-            const userId = document.getElementById('userIdInput').value;
-            const coins = parseFloat(document.getElementById('coinsToAdd').value);
-            
-            if (!userId || !coins) {
-                alert('Please enter both User ID and amount of coins!');
-                return;
-            }
+                const { error } = await supabase
+                    .from('packages')
+                    .insert({
+                        name: name,
+                        price: price,
+                        max_profit: profit,
+                        daily_tap_limit: tapLimit,
+                        duration_days: 30,
+                        is_active: true
+                    });
 
-            // In real app, make API call here
-            const user = userData.users.find(u => u.id == userId);
-            if (user) {
-                user.balance += coins;
-                loadAllUsers();
-                alert(`✅ Added $${coins} to ${user.username}'s account!`);
+                if (error) throw error;
+
+                showMessage(`✅ Package "${name}" created successfully!`, 'success');
                 
                 // Clear inputs
-                document.getElementById('userIdInput').value = '';
-                document.getElementById('coinsToAdd').value = '';
-            } else {
-                alert('❌ User not found!');
-            }
-        }
-
-        function banUser() {
-            const userId = document.getElementById('userIdInput').value;
-            
-            if (!userId) {
-                alert('Please enter User ID!');
-                return;
-            }
-
-            // In real app, make API call here
-            const user = userData.users.find(u => u.id == userId);
-            if (user) {
-                user.status = user.status === 'active' ? 'banned' : 'active';
-                loadAllUsers();
-                alert(`✅ User ${user.username} has been ${user.status === 'banned' ? 'banned' : 'unbanned'}!`);
+                document.getElementById('newPackageName').value = '';
+                document.getElementById('newPackagePrice').value = '';
+                document.getElementById('newPackageProfit').value = '';
+                document.getElementById('newPackageTapLimit').value = '';
                 
-                document.getElementById('userIdInput').value = '';
-            } else {
-                alert('❌ User not found!');
-            }
-        }
-
-        function approveWithdrawal(withdrawalId) {
-            // In real app, make API call here
-            const withdrawal = userData.withdrawals.find(w => w.id === withdrawalId);
-            if (withdrawal) {
-                withdrawal.status = 'approved';
-                loadPendingWithdrawals();
-                alert(`✅ Withdrawal of $${withdrawal.amount} for ${withdrawal.username} approved!`);
-            }
-        }
-
-        function rejectWithdrawal(withdrawalId) {
-            // In real app, make API call here
-            const withdrawal = userData.withdrawals.find(w => w.id === withdrawalId);
-            if (withdrawal) {
-                withdrawal.status = 'rejected';
-                loadPendingWithdrawals();
-                alert(`❌ Withdrawal rejected for ${withdrawal.username}`);
-            }
-        }
-
-        function approveAllWithdrawals() {
-            if (confirm('Are you sure you want to approve ALL pending withdrawals?')) {
-                userData.withdrawals.forEach(w => {
-                    if (w.status === 'pending') {
-                        w.status = 'approved';
-                    }
-                });
-                loadPendingWithdrawals();
-                alert('✅ All withdrawals approved!');
-            }
-        }
-
-        function sendBroadcast() {
-            const message = document.getElementById('broadcastMessage').value;
-            
-            if (!message.trim()) {
-                alert('Please enter a message!');
-                return;
-            }
-
-            if (confirm(`Send this message to all ${userData.users.length} users?\n\n"${message}"`)) {
-                // In real app, make API call here
-                alert(`✅ Message sent to ${userData.users.length} users!`);
-                document.getElementById('broadcastMessage').value = '';
-            }
-        }
-
-        function testBroadcast() {
-            const message = document.getElementById('broadcastMessage').value;
-            
-            if (!message.trim()) {
-                alert('Please enter a message!');
-                return;
-            }
-
-            alert(`📤 Test Message Preview:\n\n${message}`);
-        }
-
-        function addNewPackage() {
-            const price = parseFloat(document.getElementById('newPackagePrice').value);
-            const profit = parseFloat(document.getElementById('newPackageProfit').value);
-            const days = parseInt(document.getElementById('newPackageDays').value);
-
-            if (!price || !profit || !days) {
-                alert('Please fill in all package details!');
-                return;
-            }
-
-            const newPackage = {
-                id: userData.packages.length + 1,
-                price: price,
-                profit: profit,
-                duration: days,
-                active: true
-            };
-
-            userData.packages.push(newPackage);
-            loadPackageConfig();
-            
-            // Clear inputs
-            document.getElementById('newPackagePrice').value = '';
-            document.getElementById('newPackageProfit').value = '';
-            document.getElementById('newPackageDays').value = '30';
-            
-            alert(`✅ New package created: $${price} → $${profit} (${days} days)`);
-        }
-
-        function togglePackage(packageId) {
-            const pkg = userData.packages.find(p => p.id === packageId);
-            if (pkg) {
-                pkg.active = !pkg.active;
-                loadPackageConfig();
-                alert(`✅ Package #${packageId} ${pkg.active ? 'enabled' : 'disabled'}!`);
-            }
-        }
-
-        function updateAntiCheat() {
-            const maxTaps = document.getElementById('maxTapsPerSecond').value;
-            
-            if (!maxTaps) {
-                alert('Please enter maximum taps per second!');
-                return;
-            }
-
-            // In real app, save to database/config
-            alert(`✅ Anti-cheat updated: Maximum ${maxTaps} taps per second`);
-        }
-
-        function findSuspiciousUsers() {
-            // Simulate finding suspicious users
-            const suspiciousUsers = [
-                { id: 5, username: "suspicious_user1", activity: "Too fast tapping", tapsPerMinute: 1200 },
-                { id: 8, username: "bot_user", activity: "Consistent timing", tapsPerMinute: 600 }
-            ];
-
-            const table = document.getElementById('suspiciousUsersTable');
-            const tbody = document.getElementById('suspiciousUsersBody');
-            
-            tbody.innerHTML = '';
-            
-            if (suspiciousUsers.length > 0) {
-                suspiciousUsers.forEach(user => {
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td>${user.id}</td>
-                        <td>${user.username}</td>
-                        <td>${user.activity}</td>
-                        <td style="color: #ff4757; font-weight: bold;">${user.tapsPerMinute}</td>
-                        <td>
-                            <button class="btn btn-danger" onclick="banSuspiciousUser(${user.id})">🚫 Ban</button>
-                            <button class="btn btn-primary" onclick="viewUserDetails(${user.id})">👁️ Investigate</button>
-                        </td>
-                    `;
-                    tbody.appendChild(row);
-                });
+                await loadPackageConfig();
                 
-                table.style.display = 'table';
-                alert(`⚠️ Found ${suspiciousUsers.length} suspicious users!`);
-            } else {
-                alert('✅ No suspicious activity detected!');
-                table.style.display = 'none';
+            } catch (error) {
+                console.error('Error creating package:', error);
+                showMessage('Failed to create package: ' + error.message, 'error');
             }
         }
 
-        function banSuspiciousUser(userId) {
-            if (confirm(`Ban user ID ${userId} for suspicious activity?`)) {
-                // In real app, make API call here
-                alert(`✅ User ${userId} has been banned for suspicious activity!`);
-                findSuspiciousUsers(); // Refresh the list
+        async function togglePackage(packageId) {
+            try {
+                // Get current package status
+                const { data: pkg, error: getError } = await supabase
+                    .from('packages')
+                    .select('is_active, name')
+                    .eq('id', packageId)
+                    .single();
+
+                if (getError || !pkg) throw new Error('Package not found');
+
+                const newStatus = !pkg.is_active;
+                
+                const { error } = await supabase
+                    .from('packages')
+                    .update({ 
+                        is_active: newStatus,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', packageId);
+
+                if (error) throw error;
+
+                showMessage(`✅ Package "${pkg.name}" ${newStatus ? 'enabled' : 'disabled'}!`, 'success');
+                await loadPackageConfig();
+                
+            } catch (error) {
+                console.error('Error toggling package:', error);
+                showMessage('Failed to update package: ' + error.message, 'error');
             }
         }
 
-        function viewUserDetails(userId) {
-            const user = userData.users.find(u => u.id === userId);
-            if (user) {
+        async function editPackage(packageId) {
+            try {
+                // Get current package data
+                const { data: pkg, error: getError } = await supabase
+                    .from('packages')
+                    .select('*')
+                    .eq('id', packageId)
+                    .single();
+
+                if (getError || !pkg) throw new Error('Package not found');
+
+                const newName = prompt(`Enter new name for ${pkg.name}:`, pkg.name);
+                if (!newName) return;
+
+                const newPrice = prompt(`Enter new price for ${pkg.name}:`, pkg.price);
+                if (!newPrice) return;
+
+                const newProfit = prompt(`Enter new max profit for ${pkg.name}:`, pkg.max_profit);
+                if (!newProfit) return;
+
+                const newTapLimit = prompt(`Enter new daily tap limit for ${pkg.name}:`, pkg.daily_tap_limit);
+                if (!newTapLimit) return;
+
+                showMessage('Updating package...', 'info');
+
+                const { error } = await supabase
+                    .from('packages')
+                    .update({ 
+                        name: newName,
+                        price: parseFloat(newPrice),
+                        max_profit: parseFloat(newProfit),
+                        daily_tap_limit: parseInt(newTapLimit),
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', packageId);
+
+                if (error) throw error;
+
+                showMessage(`✅ Package updated successfully!`, 'success');
+                await loadPackageConfig();
+                
+            } catch (error) {
+                console.error('Error editing package:', error);
+                showMessage('Failed to edit package: ' + error.message, 'error');
+            }
+        }
+
+        async function testConnection() {
+            try {
+                const { data, error } = await supabase
+                    .from('users')
+                    .select('count(*)')
+                    .single();
+                
+                if (error) throw error;
+                
+                document.getElementById('databaseStatus').innerHTML = `
+                    <p style="color: #2ed573;">✅ Database connected successfully!</p>
+                    <p><small>Connection test completed at ${new Date().toLocaleString()}</small></p>
+                `;
+                
+            } catch (error) {
+                console.error('Connection test failed:', error);
+                document.getElementById('databaseStatus').innerHTML = `
+                    <p style="color: #ff4757;">❌ Database connection failed!</p>
+                    <p><small>Error: ${error.message}</small></p>
+                `;
+            }
+        }
+
+        async function refreshAllData() {
+            showMessage('Refreshing all data...', 'info');
+            await loadAdminData();
+            showMessage('✅ All data refreshed!', 'success');
+        }
+
+        async function viewUserDetails(userId) {
+            try {
+                const { data: user, error } = await supabase
+                    .from('users')
+                    .select(`
+                        *,
+                        user_packages!user_packages_user_id_fkey (
+                            *,
+                            packages (name, price)
+                        )
+                    `)
+                    .eq('telegram_id', userId)
+                    .single();
+                
+                if (error || !user) throw new Error('User not found');
+
+                const activePackages = user.user_packages?.filter(up => up.is_active) || [];
+                const totalInvested = user.user_packages?.reduce((sum, up) => sum + (up.packages?.price || 0), 0) || 0;
+
                 const details = `
 👤 User Details:
 ━━━━━━━━━━━━━━━━━
-ID: ${user.id}
-Username: ${user.username}
-Balance: ${user.balance.toFixed(2)}
-Active Packages: ${user.packages}
-Total Referrals: ${user.referrals}
-Account Status: ${user.status.toUpperCase()}
+Telegram ID: ${user.telegram_id}
+Username: ${user.username || 'N/A'}
+Name: ${user.first_name || ''} ${user.last_name || ''}
+Balance: ${parseFloat(user.balance || 0).toFixed(2)}
+Total Taps: ${user.total_taps || 0}
+Energy: ${user.energy || 0}/${user.max_energy || 0}
+Level: ${user.level || 1}
+Total Invested: ${totalInvested.toFixed(2)}
+Active Packages: ${activePackages.length}
+Referrals: ${user.referral_count || 0}
+Wallet: ${user.wallet_address || 'Not set'}
+Status: ${user.is_banned ? 'BANNED' : 'ACTIVE'}
+Joined: ${new Date(user.created_at).toLocaleString()}
+Last Active: ${new Date(user.last_active).toLocaleString()}
 ━━━━━━━━━━━━━━━━━
                 `.trim();
                 
                 alert(details);
-            } else {
-                alert('❌ User not found!');
-            }
-        }
-
-        function toggleUserStatus(userId) {
-            const user = userData.users.find(u => u.id === userId);
-            if (user) {
-                const action = user.status === 'active' ? 'ban' : 'unban';
-                if (confirm(`Are you sure you want to ${action} ${user.username}?`)) {
-                    user.status = user.status === 'active' ? 'banned' : 'active';
-                    loadAllUsers();
-                    alert(`✅ User ${user.username} has been ${user.status === 'banned' ? 'banned' : 'unbanned'}!`);
-                }
-            }
-        }
-
-        function editPackage(packageId) {
-            const pkg = userData.packages.find(p => p.id === packageId);
-            if (pkg) {
-                const newPrice = prompt(`Enter new price for Package #${packageId}:`, pkg.price);
-                const newProfit = prompt(`Enter new max profit for Package #${packageId}:`, pkg.profit);
-                const newDuration = prompt(`Enter new duration (days) for Package #${packageId}:`, pkg.duration);
                 
-                if (newPrice && newProfit && newDuration) {
-                    pkg.price = parseFloat(newPrice);
-                    pkg.profit = parseFloat(newProfit);
-                    pkg.duration = parseInt(newDuration);
-                    loadPackageConfig();
-                    alert(`✅ Package #${packageId} updated successfully!`);
-                }
+            } catch (error) {
+                console.error('Error getting user details:', error);
+                showMessage('Failed to load user details: ' + error.message, 'error');
             }
         }
 
-        // Helper function to format numbers
-        function formatNumber(num) {
-            return new Intl.NumberFormat().format(num);
-        }
-
-        // Helper function to format currency
-        function formatCurrency(amount) {
-            return new Intl.NumberFormat('en-US', {
-                style: 'currency',
-                currency: 'USD'
-            }).format(amount);
-        }
-
-        // Auto-refresh data every 30 seconds
-        setInterval(() => {
-            if (document.getElementById('adminPanel').style.display !== 'none') {
-                console.log('🔄 Auto-refreshing admin data...');
-                // In real app, fetch fresh data from API
-                loadAdminData();
-            }
-        }, 30000);
-
-        // Show success/error messages
+        // Helper function to show messages
         function showMessage(message, type = 'success') {
             const messageDiv = document.createElement('div');
+            messageDiv.className = type === 'success' ? 'success-message' : 'error-message';
+            messageDiv.textContent = message;
             messageDiv.style.cssText = `
                 position: fixed;
                 top: 20px;
                 right: 20px;
                 padding: 15px 20px;
                 border-radius: 8px;
-                color: white;
                 font-weight: bold;
                 z-index: 9999;
                 animation: slideIn 0.3s ease-out;
-                background: ${type === 'success' ? '#2ed573' : '#ff4757'};
+                max-width: 300px;
             `;
-            messageDiv.textContent = message;
             
             document.body.appendChild(messageDiv);
             
