@@ -5,6 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "bot": "node bot.js",
     "dev": "nodemon server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -12,8 +13,10 @@
     "express": "^4.18.2",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
-    "crypto": "^1.0.1",
-    "node-fetch": "^3.3.2"
+    "node-telegram-bot-api": "^0.64.0",
+    "@supabase/supabase-js": "^2.39.7",
+    "node-fetch": "^3.3.2",
+    "path": "^0.12.7"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
@@ -26,7 +29,7 @@
     "tap-to-earn",
     "blockchain"
   ],
-  "author": "unkown",
+  "author": "unknown",
   "license": "MIT",
   "engines": {
     "node": ">=16.0.0"
