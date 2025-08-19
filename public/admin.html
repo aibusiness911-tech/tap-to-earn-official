@@ -139,11 +139,6 @@
             color: white;
         }
         
-        .btn-warning {
-            background: #ffa726;
-            color: white;
-        }
-        
         .btn:hover {
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
@@ -168,16 +163,6 @@
         
         .form-input::placeholder {
             color: rgba(255, 255, 255, 0.6);
-        }
-        
-        .form-select {
-            padding: 10px;
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            border-radius: 8px;
-            background: rgba(255, 255, 255, 0.1);
-            color: white;
-            flex: 1;
-            min-width: 150px;
         }
         
         .withdrawal-card {
@@ -232,6 +217,22 @@
             100% { transform: rotate(360deg); }
         }
 
+        .broadcast-section {
+            margin-top: 20px;
+        }
+
+        .broadcast-textarea {
+            width: 100%;
+            min-height: 100px;
+            padding: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            resize: vertical;
+            font-family: inherit;
+        }
+
         .error-message {
             background: rgba(255, 71, 87, 0.2);
             border: 1px solid #ff4757;
@@ -248,14 +249,6 @@
             padding: 15px;
             border-radius: 8px;
             margin: 10px 0;
-        }
-
-        .manual-package-section {
-            background: rgba(255, 165, 0, 0.1);
-            border: 2px solid #ffa726;
-            border-radius: 10px;
-            padding: 20px;
-            margin-top: 20px;
         }
 
         @media (max-width: 768px) {
@@ -290,7 +283,7 @@
         <div id="databaseError" class="access-denied" style="display: none;">
             <h1>⚠️</h1>
             <h2>Database Connection Error</h2>
-            <p>Please check your Supabase credentials.</p>
+            <p>Please configure your Supabase credentials.</p>
             <div class="error-message" id="errorDetails"></div>
         </div>
 
@@ -298,7 +291,7 @@
         <div id="adminPanel" class="admin-container" style="display: none;">
             <div class="header">
                 <div class="admin-title">🎯 Admin Control Panel</div>
-                <div class="admin-subtitle">Tap to Earn Management System</div>
+                <div class="admin-subtitle">Connected to Supabase Database</div>
             </div>
 
             <!-- Stats Overview -->
@@ -346,25 +339,6 @@
                     <button class="btn btn-danger" onclick="toggleUserBan()">🚫 Ban/Unban User</button>
                 </div>
 
-                <!-- Manual Package Assignment Section -->
-                <div class="manual-package-section">
-                    <h4 style="color: #ffa726; margin-bottom: 15px;">🎁 Manual Package Assignment (After Payment)</h4>
-                    <p style="font-size: 14px; margin-bottom: 15px; opacity: 0.9;">
-                        Use this section to manually assign packages to users who have paid and contacted support.
-                    </p>
-                    <div class="input-group">
-                        <input type="number" class="form-input" id="manualUserId" placeholder="User Telegram ID">
-                        <select class="form-select" id="manualPackageSelect">
-                            <option value="">Select Package</option>
-                        </select>
-                        <button class="btn btn-warning" onclick="assignManualPackage()">🎁 Assign Package</button>
-                    </div>
-                    <div class="input-group">
-                        <input type="text" class="form-input" id="paymentProof" placeholder="Payment proof/reference">
-                        <input type="text" class="form-input" id="adminNotes" placeholder="Admin notes (optional)">
-                    </div>
-                </div>
-
                 <div style="overflow-x: auto;">
                     <table class="user-table" id="usersTable">
                         <thead>
@@ -375,7 +349,6 @@
                                 <th>Total Taps</th>
                                 <th>Level</th>
                                 <th>Referrals</th>
-                                <th>Packages</th>
                                 <th>Status</th>
                                 <th>Joined</th>
                                 <th>Actions</th>
@@ -383,7 +356,7 @@
                         </thead>
                         <tbody id="usersTableBody">
                             <tr>
-                                <td colspan="10" style="text-align: center; padding: 20px;">
+                                <td colspan="9" style="text-align: center; padding: 20px;">
                                     Click "Show All Users" to load data
                                 </td>
                             </tr>
@@ -438,11 +411,11 @@
     </div>
 
     <script>
-        // 🔥 YOUR SUPABASE CREDENTIALS
+        // 🔥 YOUR SUPABASE CREDENTIALS (CONFIGURED)
         const SUPABASE_URL = 'https://arjkzpbhinpqensoqqod.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFyamt6cGJoaW5wcWVuc29xcW9kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNjAwMTUsImV4cCI6MjA3MDYzNjAxNX0.zo5kS1J5Lv-FiRSJbt0hhaawUGB-6gNcZCgl74B7WBo';
         
-        // Your Telegram ID (ADMIN)
+        // Your Telegram ID (ALREADY SET)
         const ADMIN_TELEGRAM_ID = 6733587823;
         
         // Initialize Supabase client
@@ -460,13 +433,17 @@
                 tg.ready();
                 checkAdminAccess();
             } else {
-                // For testing without Telegram (remove this in production)
+                // For testing without Telegram
                 setTimeout(checkAdminAccess, 1000);
             }
         });
 
         function initializeSupabase() {
             try {
+                if (SUPABASE_URL === 'YOUR_SUPABASE_URL_HERE' || SUPABASE_ANON_KEY === 'YOUR_SUPABASE_ANON_KEY_HERE') {
+                    throw new Error('Supabase credentials not configured');
+                }
+                
                 supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
                 isSupabaseConnected = true;
                 console.log('✅ Supabase connected successfully');
@@ -494,8 +471,10 @@
             // Get user data from Telegram
             const telegramUser = tg?.initDataUnsafe?.user;
             
-            // For testing purposes only (REMOVE THIS LINE IN PRODUCTION)
-            const isAdmin = true; // telegramUser && telegramUser.id === ADMIN_TELEGRAM_ID;
+            // For testing purposes (comment out when deploying)
+            // const isAdmin = true;
+            
+            const isAdmin = telegramUser && telegramUser.id === ADMIN_TELEGRAM_ID;
 
             setTimeout(() => {
                 loading.style.display = 'none';
@@ -514,7 +493,6 @@
                 await Promise.all([
                     loadStats(),
                     loadPackageConfig(),
-                    loadPackageSelectOptions(),
                     testConnection()
                 ]);
             } catch (error) {
@@ -525,21 +503,19 @@
 
         async function loadStats() {
             try {
-                // Get total users - FIXED QUERY
+                // Get total users
                 const { data: users, error: usersError } = await supabase
                     .from('users')
                     .select('*');
                 
                 if (usersError) throw usersError;
 
-                // Get user packages with package details
-                const { data: userPackages, error: packagesError } = await supabase
+                // Get total revenue from packages
+                const { data: packages, error: packagesError } = await supabase
                     .from('user_packages')
                     .select(`
                         *,
-                        packages!inner (
-                            price
-                        )
+                        packages (price)
                     `);
                 
                 if (packagesError) throw packagesError;
@@ -554,13 +530,13 @@
                 // Update stats
                 document.getElementById('totalUsers').textContent = users?.length || 0;
                 
-                const totalRevenue = userPackages?.reduce((sum, pkg) => sum + (pkg.packages?.price || 0), 0) || 0;
+                const totalRevenue = packages?.reduce((sum, pkg) => sum + (pkg.packages?.price || 0), 0) || 0;
                 document.getElementById('totalRevenue').textContent = '$' + totalRevenue.toFixed(2);
                 
                 const totalTaps = users?.reduce((sum, user) => sum + (user.total_taps || 0), 0) || 0;
                 document.getElementById('totalTaps').textContent = totalTaps.toLocaleString();
                 
-                const activePackages = userPackages?.filter(pkg => pkg.is_active).length || 0;
+                const activePackages = packages?.filter(pkg => pkg.is_active).length || 0;
                 document.getElementById('activePackages').textContent = activePackages;
                 
                 const pendingWithdrawals = withdrawals?.filter(w => w.status === 'pending').length || 0;
@@ -569,36 +545,9 @@
                 const totalReferrals = users?.reduce((sum, user) => sum + (user.referral_count || 0), 0) || 0;
                 document.getElementById('totalReferrals').textContent = totalReferrals;
 
-                console.log('✅ Stats loaded successfully');
-
             } catch (error) {
                 console.error('Error loading stats:', error);
-                showMessage('Failed to load statistics: ' + error.message, 'error');
-            }
-        }
-
-        async function loadPackageSelectOptions() {
-            try {
-                const { data: packages, error } = await supabase
-                    .from('packages')
-                    .select('*')
-                    .eq('is_active', true)
-                    .order('price', { ascending: true });
-                
-                if (error) throw error;
-
-                const select = document.getElementById('manualPackageSelect');
-                select.innerHTML = '<option value="">Select Package</option>';
-                
-                packages?.forEach(pkg => {
-                    const option = document.createElement('option');
-                    option.value = pkg.id;
-                    option.textContent = `${pkg.name} ($${pkg.price})`;
-                    select.appendChild(option);
-                });
-
-            } catch (error) {
-                console.error('Error loading package options:', error);
+                showMessage('Failed to load statistics', 'error');
             }
         }
 
@@ -608,22 +557,12 @@
                 
                 const { data: users, error } = await supabase
                     .from('users')
-                    .select(`
-                        *,
-                        user_packages!user_packages_user_id_fkey (
-                            id,
-                            is_active,
-                            packages!inner (
-                                name
-                            )
-                        )
-                    `)
+                    .select('*')
                     .order('created_at', { ascending: false });
                 
                 if (error) throw error;
 
                 displayUsers(users || []);
-                showMessage('Users loaded successfully!', 'success');
                 
             } catch (error) {
                 console.error('Error loading users:', error);
@@ -636,14 +575,11 @@
             tbody.innerHTML = '';
 
             if (users.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 20px;">No users found</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px;">No users found</td></tr>';
                 return;
             }
 
             users.forEach(user => {
-                const activePackages = user.user_packages?.filter(up => up.is_active) || [];
-                const packageNames = activePackages.map(up => up.packages?.name).join(', ') || 'None';
-                
                 const row = document.createElement('tr');
                 row.innerHTML = `
                     <td>${user.telegram_id}</td>
@@ -652,7 +588,6 @@
                     <td>${user.total_taps || 0}</td>
                     <td>${user.level || 1}</td>
                     <td>${user.referral_count || 0}</td>
-                    <td><small>${packageNames}</small></td>
                     <td><span style="color: ${user.is_banned ? '#ff4757' : '#2ed573'}">${user.is_banned ? 'BANNED' : 'ACTIVE'}</span></td>
                     <td>${new Date(user.created_at).toLocaleDateString()}</td>
                     <td>
@@ -679,123 +614,17 @@
                 
                 const { data: users, error } = await supabase
                     .from('users')
-                    .select(`
-                        *,
-                        user_packages!user_packages_user_id_fkey (
-                            id,
-                            is_active,
-                            packages!inner (
-                                name
-                            )
-                        )
-                    `)
+                    .select('*')
                     .or(`username.ilike.%${searchTerm}%,telegram_id.eq.${searchTerm}`)
                     .order('created_at', { ascending: false });
                 
                 if (error) throw error;
 
                 displayUsers(users || []);
-                showMessage('Search completed!', 'success');
                 
             } catch (error) {
                 console.error('Error searching users:', error);
                 showMessage('Search failed: ' + error.message, 'error');
-            }
-        }
-
-        async function assignManualPackage() {
-            try {
-                const userId = document.getElementById('manualUserId').value;
-                const packageId = document.getElementById('manualPackageSelect').value;
-                const paymentProof = document.getElementById('paymentProof').value;
-                const adminNotes = document.getElementById('adminNotes').value;
-                
-                if (!userId || !packageId) {
-                    showMessage('Please fill in User ID and select a package!', 'error');
-                    return;
-                }
-
-                if (!paymentProof) {
-                    if (!confirm('No payment proof entered. Continue anyway?')) {
-                        return;
-                    }
-                }
-
-                showMessage('Assigning package...', 'info');
-
-                // Check if user exists
-                const { data: user, error: userError } = await supabase
-                    .from('users')
-                    .select('telegram_id, username')
-                    .eq('telegram_id', userId)
-                    .single();
-
-                if (userError || !user) {
-                    throw new Error('User not found');
-                }
-
-                // Get package details
-                const { data: packageData, error: packageError } = await supabase
-                    .from('packages')
-                    .select('*')
-                    .eq('id', packageId)
-                    .single();
-
-                if (packageError || !packageData) {
-                    throw new Error('Package not found');
-                }
-
-                // Calculate expiry date
-                const expiryDate = new Date();
-                expiryDate.setDate(expiryDate.getDate() + packageData.duration_days);
-
-                // Assign package to user
-                const { error: assignError } = await supabase
-                    .from('user_packages')
-                    .insert({
-                        user_id: userId,
-                        package_id: packageId,
-                        purchase_date: new Date().toISOString(),
-                        expiry_date: expiryDate.toISOString(),
-                        current_earnings: 0,
-                        is_active: true
-                    });
-
-                if (assignError) throw assignError;
-
-                // Log admin action
-                await supabase
-                    .from('admin_logs')
-                    .insert({
-                        admin_telegram_id: ADMIN_TELEGRAM_ID,
-                        action: 'manual_package_assignment',
-                        target_user_id: userId,
-                        details: {
-                            package_id: packageId,
-                            package_name: packageData.name,
-                            package_price: packageData.price,
-                            payment_proof: paymentProof,
-                            admin_notes: adminNotes,
-                            manual_assignment: true
-                        }
-                    });
-
-                showMessage(`✅ Package "${packageData.name}" assigned to ${user.username || userId} successfully!`, 'success');
-                
-                // Clear form
-                document.getElementById('manualUserId').value = '';
-                document.getElementById('manualPackageSelect').value = '';
-                document.getElementById('paymentProof').value = '';
-                document.getElementById('adminNotes').value = '';
-                
-                // Refresh user list
-                if (document.getElementById('usersTableBody').children.length > 1) {
-                    await loadAllUsers();
-                }
-                
-            } catch (error) {
-                console.error('Error assigning package:', error);
-                showMessage('Failed to assign package: ' + error.message, 'error');
             }
         }
 
@@ -859,16 +688,14 @@
                         }
                     });
 
-                showMessage(`✅ Added ${coinsToAdd} coins to ${user.username || userId}'s account!`, 'success');
+                showMessage(`✅ Added ${coinsToAdd} to ${user.username || userId}'s account!`, 'success');
                 
                 // Clear inputs
                 document.getElementById('userIdInput').value = '';
                 document.getElementById('coinsToAdd').value = '';
                 
-                // Refresh user list if loaded
-                if (document.getElementById('usersTableBody').children.length > 1) {
-                    await loadAllUsers();
-                }
+                // Refresh user list
+                await loadAllUsers();
                 
             } catch (error) {
                 console.error('Error adding coins:', error);
@@ -931,10 +758,8 @@
                     document.getElementById('userIdInput').value = '';
                 }
                 
-                // Refresh user list if loaded
-                if (document.getElementById('usersTableBody').children.length > 1) {
-                    await loadAllUsers();
-                }
+                // Refresh user list
+                await loadAllUsers();
                 
             } catch (error) {
                 console.error('Error toggling user ban:', error);
@@ -958,7 +783,6 @@
                 if (error) throw error;
 
                 displayWithdrawals(withdrawals || []);
-                showMessage('Withdrawals loaded!', 'success');
                 
             } catch (error) {
                 console.error('Error loading withdrawals:', error);
@@ -982,7 +806,7 @@
                     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
                         <div>
                             <strong>${withdrawal.users?.username || 'Unknown'}</strong> (ID: ${withdrawal.user_id})<br>
-                            Amount: <strong>$${parseFloat(withdrawal.amount).toFixed(2)}</strong><br>
+                            Amount: <strong>${parseFloat(withdrawal.amount).toFixed(2)}</strong><br>
                             Wallet: <code style="word-break: break-all;">${withdrawal.wallet_address}</code><br>
                             <small>Requested: ${new Date(withdrawal.request_date).toLocaleString()}</small>
                         </div>
@@ -1014,7 +838,6 @@
 
                 showMessage('✅ Withdrawal approved successfully!', 'success');
                 await loadPendingWithdrawals();
-                await loadStats(); // Refresh stats
                 
             } catch (error) {
                 console.error('Error approving withdrawal:', error);
@@ -1043,7 +866,6 @@
 
                 showMessage('❌ Withdrawal rejected successfully!', 'success');
                 await loadPendingWithdrawals();
-                await loadStats(); // Refresh stats
                 
             } catch (error) {
                 console.error('Error rejecting withdrawal:', error);
@@ -1069,7 +891,6 @@
 
                 showMessage('✅ All withdrawals approved!', 'success');
                 await loadPendingWithdrawals();
-                await loadStats(); // Refresh stats
                 
             } catch (error) {
                 console.error('Error approving all withdrawals:', error);
@@ -1108,8 +929,8 @@
                 card.className = 'package-card';
                 card.innerHTML = `
                     <h4>${pkg.name}</h4>
-                    <p><strong>Price:</strong> $${parseFloat(pkg.price).toFixed(2)}</p>
-                    <p><strong>Max Profit:</strong> $${parseFloat(pkg.max_profit).toFixed(2)}</p>
+                    <p><strong>Price:</strong> ${parseFloat(pkg.price).toFixed(2)}</p>
+                    <p><strong>Max Profit:</strong> ${parseFloat(pkg.max_profit).toFixed(2)}</p>
                     <p><strong>Duration:</strong> ${pkg.duration_days} days</p>
                     <p><strong>Daily Tap Limit:</strong> ${pkg.daily_tap_limit}</p>
                     <p><strong>Status:</strong> <span style="color: ${pkg.is_active ? '#2ed573' : '#ff4757'}">${pkg.is_active ? 'Active' : 'Inactive'}</span></p>
@@ -1160,7 +981,6 @@
                 document.getElementById('newPackageTapLimit').value = '';
                 
                 await loadPackageConfig();
-                await loadPackageSelectOptions();
                 
             } catch (error) {
                 console.error('Error creating package:', error);
@@ -1193,7 +1013,6 @@
 
                 showMessage(`✅ Package "${pkg.name}" ${newStatus ? 'enabled' : 'disabled'}!`, 'success');
                 await loadPackageConfig();
-                await loadPackageSelectOptions();
                 
             } catch (error) {
                 console.error('Error toggling package:', error);
@@ -1241,7 +1060,6 @@
 
                 showMessage(`✅ Package updated successfully!`, 'success');
                 await loadPackageConfig();
-                await loadPackageSelectOptions();
                 
             } catch (error) {
                 console.error('Error editing package:', error);
@@ -1251,43 +1069,31 @@
 
         async function testConnection() {
             try {
-                showMessage('Testing database connection...', 'info');
-                
                 const { data, error } = await supabase
                     .from('users')
-                    .select('telegram_id')
-                    .limit(1);
+                    .select('count(*)')
+                    .single();
                 
                 if (error) throw error;
                 
                 document.getElementById('databaseStatus').innerHTML = `
                     <p style="color: #2ed573;">✅ Database connected successfully!</p>
                     <p><small>Connection test completed at ${new Date().toLocaleString()}</small></p>
-                    <p><small>Supabase URL: ${SUPABASE_URL}</small></p>
                 `;
-                
-                showMessage('✅ Database connection successful!', 'success');
                 
             } catch (error) {
                 console.error('Connection test failed:', error);
                 document.getElementById('databaseStatus').innerHTML = `
                     <p style="color: #ff4757;">❌ Database connection failed!</p>
                     <p><small>Error: ${error.message}</small></p>
-                    <p><small>Please check your Supabase credentials</small></p>
                 `;
-                showMessage('❌ Database connection failed!', 'error');
             }
         }
 
         async function refreshAllData() {
             showMessage('Refreshing all data...', 'info');
-            try {
-                await loadAdminData();
-                showMessage('✅ All data refreshed successfully!', 'success');
-            } catch (error) {
-                console.error('Error refreshing data:', error);
-                showMessage('Failed to refresh data: ' + error.message, 'error');
-            }
+            await loadAdminData();
+            showMessage('✅ All data refreshed!', 'success');
         }
 
         async function viewUserDetails(userId) {
@@ -1298,11 +1104,7 @@
                         *,
                         user_packages!user_packages_user_id_fkey (
                             *,
-                            packages!inner (
-                                name, 
-                                price,
-                                max_profit
-                            )
+                            packages (name, price)
                         )
                     `)
                     .eq('telegram_id', userId)
@@ -1312,15 +1114,6 @@
 
                 const activePackages = user.user_packages?.filter(up => up.is_active) || [];
                 const totalInvested = user.user_packages?.reduce((sum, up) => sum + (up.packages?.price || 0), 0) || 0;
-
-                let packageDetails = '';
-                if (activePackages.length > 0) {
-                    packageDetails = activePackages.map(up => 
-                        `${up.packages?.name} (${up.packages?.price}) - Earned: ${parseFloat(up.current_earnings || 0).toFixed(2)}/${up.packages?.max_profit}`
-                    ).join('\n');
-                } else {
-                    packageDetails = 'No active packages';
-                }
 
                 const details = `
 👤 User Details:
@@ -1334,13 +1127,11 @@ Energy: ${user.energy || 0}/${user.max_energy || 0}
 Level: ${user.level || 1}
 Total Invested: ${totalInvested.toFixed(2)}
 Active Packages: ${activePackages.length}
-Package Details:
-${packageDetails}
 Referrals: ${user.referral_count || 0}
 Wallet: ${user.wallet_address || 'Not set'}
 Status: ${user.is_banned ? 'BANNED' : 'ACTIVE'}
 Joined: ${new Date(user.created_at).toLocaleString()}
-Last Active: ${user.last_active ? new Date(user.last_active).toLocaleString() : 'N/A'}
+Last Active: ${new Date(user.last_active).toLocaleString()}
 ━━━━━━━━━━━━━━━━━
                 `.trim();
                 
@@ -1355,7 +1146,7 @@ Last Active: ${user.last_active ? new Date(user.last_active).toLocaleString() : 
         // Helper function to show messages
         function showMessage(message, type = 'success') {
             const messageDiv = document.createElement('div');
-            messageDiv.className = type === 'success' ? 'success-message' : type === 'info' ? 'info-message' : 'error-message';
+            messageDiv.className = type === 'success' ? 'success-message' : 'error-message';
             messageDiv.textContent = message;
             messageDiv.style.cssText = `
                 position: fixed;
@@ -1367,14 +1158,13 @@ Last Active: ${user.last_active ? new Date(user.last_active).toLocaleString() : 
                 z-index: 9999;
                 animation: slideIn 0.3s ease-out;
                 max-width: 300px;
-                ${type === 'info' ? 'background: rgba(0, 212, 255, 0.2); border: 1px solid #00d4ff; color: #00d4ff;' : ''}
             `;
             
             document.body.appendChild(messageDiv);
             
             setTimeout(() => {
                 messageDiv.remove();
-            }, 4000);
+            }, 3000);
         }
 
         // Add CSS animation for messages
@@ -1384,47 +1174,8 @@ Last Active: ${user.last_active ? new Date(user.last_active).toLocaleString() : 
                 from { transform: translateX(100%); opacity: 0; }
                 to { transform: translateX(0); opacity: 1; }
             }
-            .info-message {
-                background: rgba(0, 212, 255, 0.2);
-                border: 1px solid #00d4ff;
-                color: #00d4ff;
-            }
         `;
         document.head.appendChild(style);
-
-        // Auto-refresh stats every 30 seconds
-        setInterval(async () => {
-            try {
-                await loadStats();
-                console.log('📊 Stats auto-refreshed');
-            } catch (error) {
-                console.error('Auto-refresh failed:', error);
-            }
-        }, 30000);
-
-        // Initialize keyboard shortcuts
-        document.addEventListener('keydown', function(e) {
-            // Ctrl/Cmd + R for refresh
-            if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
-                e.preventDefault();
-                refreshAllData();
-            }
-            
-            // Ctrl/Cmd + U for users
-            if ((e.ctrlKey || e.metaKey) && e.key === 'u') {
-                e.preventDefault();
-                loadAllUsers();
-            }
-            
-            // Ctrl/Cmd + W for withdrawals
-            if ((e.ctrlKey || e.metaKey) && e.key === 'w') {
-                e.preventDefault();
-                loadPendingWithdrawals();
-            }
-        });
-
-        console.log('🎯 Admin Panel Initialized Successfully');
-        console.log('📋 Keyboard Shortcuts:');
-        console.log('   Ctrl+R: Refresh All Data');
-        console.log('   Ctrl+U: Load All Users');
-        console.log('   Ctrl+W: Load Withdrawals');
+    </script>
+</body>
+</html>
