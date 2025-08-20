@@ -483,11 +483,6 @@
                     auth: {
                         autoRefreshToken: false,
                         persistSession: false
-                    },
-                    global: {
-                        headers: {
-                            'X-Client-Info': 'admin-panel'
-                        }
                     }
                 });
                 isSupabaseConnected = true;
@@ -632,7 +627,7 @@
                     const price = pkg.packages?.price || 0;
                     return sum + price;
                 }, 0);
-                document.getElementById('totalRevenue').textContent = '
+                document.getElementById('totalRevenue').textContent = '$' + totalRevenue.toFixed(2);
 
         async function loadPackageSelect() {
             try {
