@@ -1,1119 +1,1403 @@
-const express = require('express');
-const cors = require('cors');
-const crypto = require('crypto');
-const fs = require('fs').promises;
-const path = require('path');
-const { createClient } = require('@supabase/supabase-js');
-
-const app = express();
-const PORT = process.env.PORT || 3000;
-
-// Middleware
-app.use(cors());
-app.use(express.json());
-app.use(express.static('public'));
-
-// Environment variables
-const BOT_TOKEN = process.env.BOT_TOKEN || '8105964064:AAE1rkye54RSBevmnYIIOBpCZnAkrMX-VsE';
-const TON_API_KEY = process.env.TON_API_KEY || 'f0fae942c8bd9f735ce3cdf968aecdbc5bb2815d20966bf0a1b282b5ee9121d0';
-const COINGECKO_API_KEY = process.env.COINGECKO_API_KEY || 'CG-hNmKKyJRW1rZMhPASKoAYsEr';
-const OWNER_WALLET = 'UQCUVSKh4SkJyEjhli0ntFVMkMYOLrm2_a5A6w4hWZwQCsOT';
-
-// Initialize Supabase
-const supabase = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_ANON_KEY
-);
-
-// Helper function to get current TON price
-async function getTonPrice() {
-    try {
-        const response = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=the-open-network&vs_currencies=usd&x_cg_demo_api_key=${COINGECKO_API_KEY}`);
-        const data = await response.json();
-        return data['the-open-network']?.usd || 3.31;
-    } catch (error) {
-        console.error('Error fetching TON price:', error);
-        return 3.31; // Fallback price
-    }
-}
-
-// Helper function to validate Telegram WebApp data
-function validateTelegramData(initData) {
-    try {
-        const urlParams = new URLSearchParams(initData);
-        const hash = urlParams.get('hash');
-        urlParams.delete('hash');
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - Tap to Earn</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.7/dist/umd/supabase.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
         
-        const dataCheckString = Array.from(urlParams.entries())
-            .sort(([a], [b]) => a.localeCompare(b))
-            .map(([key, value]) => `${key}=${value}`)
-            .join('\n');
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1e3c72, #2a5298);
+            color: white;
+            min-height: 100vh;
+        }
         
-        const secretKey = crypto.createHmac('sha256', 'WebAppData').update(BOT_TOKEN).digest();
-        const calculatedHash = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
+        .admin-container {
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
         
-        return calculatedHash === hash;
-    } catch (error) {
-        console.error('Telegram validation error:', error);
-        return false;
-    }
-}
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .admin-title {
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .admin-subtitle {
+            opacity: 0.8;
+            font-size: 16px;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .stat-number {
+            font-size: 32px;
+            font-weight: bold;
+            color: #00d4ff;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            opacity: 0.8;
+            font-size: 14px;
+        }
+        
+        .admin-sections {
+            display: grid;
+            gap: 30px;
+        }
+        
+        .section {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 25px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .section-title {
+            font-size: 22px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            color: #00d4ff;
+        }
+        
+        .user-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            font-size: 12px;
+        }
+        
+        .user-table th,
+        .user-table td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .user-table th {
+            background: rgba(255, 255, 255, 0.1);
+            font-weight: bold;
+        }
+        
+        .btn {
+            padding: 8px 12px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 2px;
+            transition: all 0.3s ease;
+            font-size: 11px;
+        }
+        
+        .btn-danger {
+            background: #ff4757;
+            color: white;
+        }
+        
+        .btn-success {
+            background: #2ed573;
+            color: white;
+        }
+        
+        .btn-primary {
+            background: #3742fa;
+            color: white;
+        }
 
-// Helper function to check TON transactions
-async function checkTonTransaction(address, amount, memo = '') {
-    try {
-        const response = await fetch(`https://toncenter.com/api/v2/getTransactions?address=${OWNER_WALLET}&limit=10&api_key=${TON_API_KEY}`);
-        const data = await response.json();
+        .btn-warning {
+            background: #ffa726;
+            color: white;
+        }
         
-        if (!data.ok || !data.result) return false;
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
         
-        const transactions = data.result;
-        const targetAmount = Math.floor(amount * 1000000000); // Convert to nanoTON
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
         
-        // Check recent transactions (last 10 minutes)
-        const tenMinutesAgo = Date.now() - (10 * 60 * 1000);
+        .form-input, .form-select {
+            padding: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            flex: 1;
+            min-width: 150px;
+        }
+
+        .form-select option {
+            background: #2a5298;
+            color: white;
+        }
         
-        for (const tx of transactions) {
-            if (tx.utime * 1000 < tenMinutesAgo) break;
+        .form-input::placeholder {
+            color: rgba(255, 255, 255, 0.6);
+        }
+        
+        .withdrawal-card {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            border-left: 4px solid #ffa726;
+        }
+        
+        .package-config {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        
+        .package-card {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .access-denied {
+            text-align: center;
+            padding: 50px 20px;
+        }
+        
+        .access-denied h1 {
+            font-size: 48px;
+            color: #ff4757;
+            margin-bottom: 20px;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 50px 20px;
+        }
+        
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #00d4ff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .broadcast-section {
+            margin-top: 20px;
+        }
+
+        .broadcast-textarea {
+            width: 100%;
+            min-height: 100px;
+            padding: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            resize: vertical;
+            font-family: inherit;
+        }
+
+        .error-message {
+            background: rgba(255, 71, 87, 0.2);
+            border: 1px solid #ff4757;
+            color: #ff4757;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+
+        .success-message {
+            background: rgba(46, 213, 115, 0.2);
+            border: 1px solid #2ed573;
+            color: #2ed573;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+
+        .package-assignment-section {
+            background: rgba(255, 167, 38, 0.1);
+            border: 1px solid rgba(255, 167, 38, 0.3);
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
             
-            if (tx.in_msg && tx.in_msg.value && 
-                parseInt(tx.in_msg.value) >= targetAmount &&
-                tx.in_msg.source?.address === address) {
-                return true;
+            .input-group {
+                flex-direction: column;
             }
         }
-        
-        return false;
-    } catch (error) {
-        console.error('Error checking TON transaction:', error);
-        return false;
-    }
-}
+    </style>
+</head>
+<body>
+    <div id="app">
+        <!-- Loading State -->
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            <h2>Loading Admin Panel...</h2>
+            <p>Connecting to database...</p>
+        </div>
 
-// Helper function to send TON (simplified - you'd use actual TON SDK)
-async function sendTon(toAddress, amount, memo = '') {
-    try {
-        // This is a placeholder - in production, you'd use:
-        // - TON SDK to create and sign transactions
-        // - Your wallet's private key (securely stored)
-        // - Proper transaction broadcasting
-        
-        console.log(`Sending ${amount} TON to ${toAddress} with memo: ${memo}`);
-        
-        // For demo purposes, we'll simulate a successful transaction
-        return {
-            success: true,
-            txHash: crypto.randomBytes(32).toString('hex'),
-            message: 'Transaction sent successfully'
-        };
-    } catch (error) {
-        console.error('Error sending TON:', error);
-        return {
-            success: false,
-            error: error.message
-        };
-    }
-}
+        <!-- Access Denied -->
+        <div id="accessDenied" class="access-denied" style="display: none;">
+            <h1>🚫</h1>
+            <h2>Access Denied</h2>
+            <p>You don't have admin privileges to access this panel.</p>
+            <p>Contact the administrator if you believe this is an error.</p>
+        </div>
 
-// Get or create user in database
-async function getOrCreateUser(userId) {
-    try {
-        const { data: existingUser, error: fetchError } = await supabase
-            .from('users')
-            .select('*')
-            .eq('telegram_id', userId)
-            .single();
+        <!-- Database Error -->
+        <div id="databaseError" class="access-denied" style="display: none;">
+            <h1>⚠️</h1>
+            <h2>Database Connection Error</h2>
+            <p>Please configure your Supabase credentials.</p>
+            <div class="error-message" id="errorDetails"></div>
+        </div>
 
-        if (existingUser) {
-            // Update last active
-            await supabase
-                .from('users')
-                .update({ 
-                    last_active: new Date().toISOString()
-                })
-                .eq('telegram_id', userId);
-            
-            return existingUser;
-        }
+        <!-- Admin Panel -->
+        <div id="adminPanel" class="admin-container" style="display: none;">
+            <div class="header">
+                <div class="admin-title">🎯 Admin Control Panel</div>
+                <div class="admin-subtitle">Connected to Supabase Database</div>
+            </div>
 
-        // Create new user
-        const { data: newUser, error: createError } = await supabase
-            .from('users')
-            .insert({
-                telegram_id: userId,
-                balance: 0,
-                total_taps: 0,
-                energy: 1000,
-                max_energy: 1000,
-                level: 1,
-                referral_count: 0,
-                tap_value: 0.05,
-                daily_tap_limit: 100,
-                taps_used_today: 0,
-                last_tap_reset: new Date().toISOString(),
-                active_package: null,
-                package_earnings: 0,
-                max_package_earnings: 0,
-                unlimited_taps: false
-            })
-            .select()
-            .single();
+            <!-- Stats Overview -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number" id="totalUsers">0</div>
+                    <div class="stat-label">Total Users</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="totalRevenue">$0</div>
+                    <div class="stat-label">Total Revenue</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="totalTaps">0</div>
+                    <div class="stat-label">Total Taps</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="activePackages">0</div>
+                    <div class="stat-label">Active Packages</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="pendingWithdrawals">0</div>
+                    <div class="stat-label">Pending Withdrawals</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="totalReferrals">0</div>
+                    <div class="stat-label">Total Referrals</div>
+                </div>
+            </div>
 
-        if (createError) throw createError;
-        return newUser;
-    } catch (error) {
-        console.error('Error managing user:', error);
-        return null;
-    }
-}
-
-// Check daily reset (UTC time)
-async function checkDailyReset(user) {
-    const now = new Date();
-    const lastReset = new Date(user.last_tap_reset);
-    
-    if (now.getUTCDate() !== lastReset.getUTCDate() || 
-        now.getUTCMonth() !== lastReset.getUTCMonth() || 
-        now.getUTCFullYear() !== lastReset.getUTCFullYear()) {
-        
-        // Reset daily taps
-        const { error } = await supabase
-            .from('users')
-            .update({
-                taps_used_today: 0,
-                last_tap_reset: now.toISOString()
-            })
-            .eq('telegram_id', user.telegram_id);
-        
-        if (!error) {
-            user.taps_used_today = 0;
-            user.last_tap_reset = now.toISOString();
-        }
-    }
-}
-
-// Serve the main page
-app.get('/', async (req, res) => {
-    try {
-        const html = await fs.readFile(path.join(__dirname, 'index.html'), 'utf8');
-        res.send(html);
-    } catch (error) {
-        res.status(500).send('Server error loading page');
-    }
-});
-
-// Get user data
-app.get('/api/user/:userId', async (req, res) => {
-    try {
-        const userId = parseInt(req.params.userId);
-        const user = await getOrCreateUser(userId);
-        
-        if (!user) {
-            return res.status(404).json({ error: 'User not found' });
-        }
-        
-        // Check daily reset
-        await checkDailyReset(user);
-        
-        // Calculate current values
-        const tonPrice = await getTonPrice();
-        const dollarValue = parseFloat(user.balance) / 1000;
-        const tonValue = dollarValue / tonPrice;
-        
-        // Calculate taps remaining
-        const tapsRemaining = user.unlimited_taps ? 999999 : (user.daily_tap_limit - user.taps_used_today);
-        
-        res.json({
-            id: user.telegram_id,
-            points: parseFloat(user.balance),
-            tapsRemaining: Math.max(0, tapsRemaining),
-            tapValue: parseFloat(user.tap_value),
-            activePackage: user.active_package,
-            packageEarnings: parseFloat(user.package_earnings || 0),
-            maxPackageEarnings: parseFloat(user.max_package_earnings || 0),
-            unlimitedTaps: user.unlimited_taps,
-            totalReferrals: user.referral_count,
-            referralEarnings: user.referral_count * 100, // 100 points per referral
-            dollarValue,
-            tonValue,
-            tonPrice,
-            level: user.level,
-            energy: user.energy,
-            maxEnergy: user.max_energy
-        });
-    } catch (error) {
-        console.error('Error getting user:', error);
-        res.status(500).json({ error: 'Failed to get user data' });
-    }
-});
-
-// Handle tap
-app.post('/api/tap', async (req, res) => {
-    try {
-        const { userId } = req.body;
-        
-        if (!userId) {
-            return res.status(400).json({ error: 'User ID required' });
-        }
-        
-        const user = await getOrCreateUser(parseInt(userId));
-        if (!user) {
-            return res.status(404).json({ error: 'User not found' });
-        }
-        
-        await checkDailyReset(user);
-        
-        // Check if user can tap
-        const tapsRemaining = user.unlimited_taps ? 999999 : (user.daily_tap_limit - user.taps_used_today);
-        if (tapsRemaining <= 0) {
-            return res.status(400).json({ error: 'No taps remaining' });
-        }
-        
-        // Check package limits
-        if (user.max_package_earnings > 0 && user.package_earnings >= user.max_package_earnings) {
-            return res.status(400).json({ error: 'Package earning limit reached' });
-        }
-        
-        // Process tap
-        const tapValue = parseFloat(user.tap_value);
-        const newBalance = parseFloat(user.balance) + tapValue;
-        const newPackageEarnings = parseFloat(user.package_earnings || 0) + tapValue;
-        const newTotalTaps = user.total_taps + 1;
-        const newTapsUsedToday = user.taps_used_today + 1;
-        
-        // Update user in database
-        const { error } = await supabase
-            .from('users')
-            .update({
-                balance: newBalance,
-                package_earnings: newPackageEarnings,
-                total_taps: newTotalTaps,
-                taps_used_today: user.unlimited_taps ? user.taps_used_today : newTapsUsedToday,
-                last_active: new Date().toISOString()
-            })
-            .eq('telegram_id', user.telegram_id);
-        
-        if (error) {
-            throw error;
-        }
-        
-        // Log transaction
-        await supabase
-            .from('transactions')
-            .insert({
-                user_id: user.telegram_id,
-                type: 'tap',
-                amount: tapValue,
-                description: 'Tap earning'
-            });
-        
-        // Calculate current values
-        const tonPrice = await getTonPrice();
-        const dollarValue = newBalance / 1000;
-        const tonValue = dollarValue / tonPrice;
-        
-        res.json({
-            success: true,
-            user: {
-                id: user.telegram_id,
-                points: newBalance,
-                tapsRemaining: user.unlimited_taps ? 999999 : Math.max(0, user.daily_tap_limit - newTapsUsedToday),
-                tapValue: tapValue,
-                activePackage: user.active_package,
-                packageEarnings: newPackageEarnings,
-                maxPackageEarnings: parseFloat(user.max_package_earnings || 0),
-                unlimitedTaps: user.unlimited_taps,
-                totalReferrals: user.referral_count,
-                referralEarnings: user.referral_count * 100,
-                dollarValue,
-                tonValue,
-                tonPrice,
-                level: user.level,
-                energy: user.energy,
-                maxEnergy: user.max_energy
-            }
-        });
-    } catch (error) {
-        console.error('Tap error:', error);
-        res.status(500).json({ error: 'Failed to process tap' });
-    }
-});
-
-// Handle package purchase
-app.post('/api/buy-package', async (req, res) => {
-    try {
-        const { userId, packageId, transactionHash } = req.body;
-        
-        if (!userId || !packageId) {
-            return res.status(400).json({ error: 'Missing required fields' });
-        }
-        
-        const user = await getOrCreateUser(parseInt(userId));
-        if (!user) {
-            return res.status(404).json({ error: 'User not found' });
-        }
-        
-        // Get package from database
-        const { data: packageData, error: packageError } = await supabase
-            .from('packages')
-            .select('*')
-            .eq('id', packageId)
-            .eq('is_active', true)
-            .single();
-        
-        if (packageError || !packageData) {
-            return res.status(400).json({ error: 'Invalid package' });
-        }
-        
-        // In production, verify the transaction here
-        if (transactionHash) {
-            console.log(`Verifying transaction ${transactionHash} for package ${packageId}`);
-        }
-        
-        // Update user with package
-        const { error } = await supabase
-            .from('users')
-            .update({
-                active_package: packageData.name,
-                tap_value: packageData.tap_multiplier * 0.05, // Base tap value * multiplier
-                max_package_earnings: packageData.max_profit * 1000, // Convert to points
-                package_earnings: 0,
-                unlimited_taps: packageData.unlimited_taps || false,
-                last_active: new Date().toISOString()
-            })
-            .eq('telegram_id', user.telegram_id);
-        
-        if (error) {
-            throw error;
-        }
-        
-        // Log package purchase
-        await supabase
-            .from('transactions')
-            .insert({
-                user_id: user.telegram_id,
-                type: 'package_purchase',
-                amount: -packageData.price * 1000, // Negative because it's a purchase
-                description: `Purchased ${packageData.name} package`,
-                metadata: { package_id: packageId, transaction_hash: transactionHash }
-            });
-        
-        const tonPrice = await getTonPrice();
-        const dollarValue = parseFloat(user.balance) / 1000;
-        const tonValue = dollarValue / tonPrice;
-        
-        res.json({
-            success: true,
-            user: {
-                id: user.telegram_id,
-                points: parseFloat(user.balance),
-                tapsRemaining: packageData.unlimited_taps ? 999999 : (user.daily_tap_limit - user.taps_used_today),
-                tapValue: packageData.tap_multiplier * 0.05,
-                activePackage: packageData.name,
-                packageEarnings: 0,
-                maxPackageEarnings: packageData.max_profit * 1000,
-                unlimitedTaps: packageData.unlimited_taps || false,
-                totalReferrals: user.referral_count,
-                referralEarnings: user.referral_count * 100,
-                dollarValue,
-                tonValue,
-                tonPrice,
-                level: user.level,
-                energy: user.energy,
-                maxEnergy: user.max_energy
-            },
-            message: 'Package activated successfully!'
-        });
-    } catch (error) {
-        console.error('Package purchase error:', error);
-        res.status(500).json({ error: 'Failed to process package purchase' });
-    }
-});
-
-// Handle withdrawal request
-app.post('/api/withdraw', async (req, res) => {
-    try {
-        const { userId, amount, walletAddress, feeTransactionHash } = req.body;
-        
-        if (!userId || !amount || !walletAddress) {
-            return res.status(400).json({ error: 'Missing required fields' });
-        }
-        
-        const user = await getOrCreateUser(parseInt(userId));
-        if (!user) {
-            return res.status(404).json({ error: 'User not found' });
-        }
-        
-        const tonPrice = await getTonPrice();
-        
-        // Validate withdrawal
-        if (amount < 0.01) {
-            return res.status(400).json({ error: 'Minimum withdrawal is 0.01 TON' });
-        }
-        
-        const requiredPoints = amount * tonPrice * 1000;
-        if (parseFloat(user.balance) < requiredPoints) {
-            return res.status(400).json({ error: 'Insufficient balance' });
-        }
-        
-        // Check if user has any pending withdrawals
-        const { data: pendingWithdrawals } = await supabase
-            .from('withdrawals')
-            .select('*')
-            .eq('user_id', user.telegram_id)
-            .eq('status', 'pending');
-        
-        if (pendingWithdrawals && pendingWithdrawals.length > 0) {
-            return res.status(400).json({ error: 'You have a pending withdrawal request' });
-        }
-        
-        // In production, verify the fee transaction here
-        if (feeTransactionHash) {
-            console.log(`Verifying fee transaction ${feeTransactionHash}`);
-        }
-        
-        // Create withdrawal request
-        const { data: withdrawal, error: withdrawalError } = await supabase
-            .from('withdrawals')
-            .insert({
-                user_id: user.telegram_id,
-                amount: amount,
-                wallet_address: walletAddress,
-                status: 'pending',
-                fee_transaction_hash: feeTransactionHash,
-                request_date: new Date().toISOString()
-            })
-            .select()
-            .single();
-        
-        if (withdrawalError) {
-            throw withdrawalError;
-        }
-        
-        // Deduct points from user
-        const newBalance = parseFloat(user.balance) - requiredPoints;
-        
-        const { error: updateError } = await supabase
-            .from('users')
-            .update({
-                balance: newBalance,
-                last_active: new Date().toISOString()
-            })
-            .eq('telegram_id', user.telegram_id);
-        
-        if (updateError) {
-            throw updateError;
-        }
-        
-        // Log transaction
-        await supabase
-            .from('transactions')
-            .insert({
-                user_id: user.telegram_id,
-                type: 'withdrawal',
-                amount: -requiredPoints,
-                description: `Withdrawal of ${amount} TON to ${walletAddress}`,
-                metadata: { 
-                    withdrawal_id: withdrawal.id,
-                    wallet_address: walletAddress,
-                    ton_amount: amount
-                }
-            });
-        
-        const dollarValue = newBalance / 1000;
-        const tonValue = dollarValue / tonPrice;
-        
-        res.json({
-            success: true,
-            withdrawalId: withdrawal.id,
-            user: {
-                id: user.telegram_id,
-                points: newBalance,
-                dollarValue,
-                tonValue,
-                tonPrice
-            },
-            message: 'Withdrawal request submitted successfully!'
-        });
-    } catch (error) {
-        console.error('Withdrawal error:', error);
-        res.status(500).json({ error: 'Failed to process withdrawal' });
-    }
-});
-
-// Get withdrawal status
-app.get('/api/withdrawal/:withdrawalId', async (req, res) => {
-    try {
-        const withdrawalId = req.params.withdrawalId;
-        
-        const { data: withdrawal, error } = await supabase
-            .from('withdrawals')
-            .select('*')
-            .eq('id', withdrawalId)
-            .single();
-        
-        if (error || !withdrawal) {
-            return res.status(404).json({ error: 'Withdrawal not found' });
-        }
-        
-        res.json(withdrawal);
-    } catch (error) {
-        console.error('Error getting withdrawal status:', error);
-        res.status(500).json({ error: 'Failed to get withdrawal status' });
-    }
-});
-
-// Handle referral
-app.post('/api/referral', async (req, res) => {
-    try {
-        const { userId, referrerId } = req.body;
-        
-        if (!userId || !referrerId || userId === referrerId) {
-            return res.status(400).json({ error: 'Invalid referral data' });
-        }
-        
-        const user = await getOrCreateUser(parseInt(userId));
-        const referrer = await getOrCreateUser(parseInt(referrerId));
-        
-        if (!user || !referrer) {
-            return res.status(404).json({ error: 'User not found' });
-        }
-        
-        // Check if user is already referred
-        if (user.referrer_id) {
-            return res.status(400).json({ error: 'User already referred' });
-        }
-        
-        // Update user with referrer
-        const { error: userError } = await supabase
-            .from('users')
-            .update({ referrer_id: referrer.telegram_id })
-            .eq('telegram_id', user.telegram_id);
-        
-        if (userError) {
-            throw userError;
-        }
-        
-        // Award referral bonus to referrer
-        const bonusAmount = 100;
-        const newReferrerBalance = parseFloat(referrer.balance) + bonusAmount;
-        const newReferralCount = referrer.referral_count + 1;
-        
-        const { error: referrerError } = await supabase
-            .from('users')
-            .update({
-                balance: newReferrerBalance,
-                referral_count: newReferralCount,
-                last_active: new Date().toISOString()
-            })
-            .eq('telegram_id', referrer.telegram_id);
-        
-        if (referrerError) {
-            throw referrerError;
-        }
-        
-        // Log referral transaction
-        await supabase
-            .from('transactions')
-            .insert({
-                user_id: referrer.telegram_id,
-                type: 'referral_bonus',
-                amount: bonusAmount,
-                description: `Referral bonus from user ${userId}`
-            });
-        
-        const tonPrice = await getTonPrice();
-        const dollarValue = newReferrerBalance / 1000;
-        const tonValue = dollarValue / tonPrice;
-        
-        res.json({
-            success: true,
-            referrer: {
-                id: referrer.telegram_id,
-                points: newReferrerBalance,
-                totalReferrals: newReferralCount,
-                referralEarnings: newReferralCount * 100,
-                dollarValue,
-                tonValue,
-                tonPrice
-            },
-            message: 'Referral bonus awarded!'
-        });
-    } catch (error) {
-        console.error('Referral error:', error);
-        res.status(500).json({ error: 'Failed to process referral' });
-    }
-});
-
-// Get referral data
-app.get('/api/referrals/:userId', async (req, res) => {
-    try {
-        const userId = parseInt(req.params.userId);
-        
-        const { data: user } = await supabase
-            .from('users')
-            .select('referral_count')
-            .eq('telegram_id', userId)
-            .single();
-        
-        const { data: referrals } = await supabase
-            .from('users')
-            .select('telegram_id, username, first_name, created_at, balance')
-            .eq('referrer_id', userId)
-            .order('created_at', { ascending: false })
-            .limit(50);
-        
-        const referralsList = referrals ? referrals.map(ref => ({
-            id: ref.telegram_id,
-            username: ref.username || ref.first_name || `User${ref.telegram_id.toString().slice(-4)}`,
-            points: parseFloat(ref.balance || 0),
-            joinedAt: ref.created_at
-        })) : [];
-        
-        res.json({
-            totalReferrals: user?.referral_count || 0,
-            referralEarnings: (user?.referral_count || 0) * 100,
-            referrals: referralsList,
-            referralLink: `https://t.me/Taptoearnofficial_bot?start=${userId}`
-        });
-    } catch (error) {
-        console.error('Error getting referrals:', error);
-        res.status(500).json({ error: 'Failed to get referral data' });
-    }
-});
-
-// Get current TON price
-app.get('/api/ton-price', async (req, res) => {
-    try {
-        const price = await getTonPrice();
-        res.json({ price });
-    } catch (error) {
-        console.error('Error getting TON price:', error);
-        res.status(500).json({ error: 'Failed to get TON price' });
-    }
-});
-
-// Get available packages
-app.get('/api/packages', async (req, res) => {
-    try {
-        const { data: packages, error } = await supabase
-            .from('packages')
-            .select('*')
-            .eq('is_active', true)
-            .order('price', { ascending: true });
-        
-        if (error) {
-            throw error;
-        }
-        
-        res.json(packages || []);
-    } catch (error) {
-        console.error('Error getting packages:', error);
-        res.status(500).json({ error: 'Failed to get packages' });
-    }
-});
-
-// Admin endpoints
-app.get('/api/admin/stats', async (req, res) => {
-    try {
-        // Get total users
-        const { count: totalUsers } = await supabase
-            .from('users')
-            .select('*', { count: 'exact', head: true });
-        
-        // Get total balance
-        const { data: balanceData } = await supabase
-            .from('users')
-            .select('balance');
-        
-        const totalBalance = balanceData ? 
-            balanceData.reduce((sum, user) => sum + parseFloat(user.balance || 0), 0) : 0;
-        
-        // Get total referrals
-        const { data: referralData } = await supabase
-            .from('users')
-            .select('referral_count');
-        
-        const totalReferrals = referralData ? 
-            referralData.reduce((sum, user) => sum + (user.referral_count || 0), 0) : 0;
-        
-        // Get pending withdrawals
-        const { count: pendingWithdrawals } = await supabase
-            .from('withdrawals')
-            .select('*', { count: 'exact', head: true })
-            .eq('status', 'pending');
-        
-        // Get active packages
-        const { count: activePackages } = await supabase
-            .from('users')
-            .select('*', { count: 'exact', head: true })
-            .not('active_package', 'is', null);
-        
-        const stats = {
-            totalUsers: totalUsers || 0,
-            totalBalance: totalBalance,
-            totalReferrals: totalReferrals,
-            pendingWithdrawals: pendingWithdrawals || 0,
-            activePackages: activePackages || 0
-        };
-        
-        res.json(stats);
-    } catch (error) {
-        console.error('Error getting admin stats:', error);
-        res.status(500).json({ error: 'Failed to get stats' });
-    }
-});
-
-// Manual package activation (for admin use)
-app.post('/api/admin/activate-package', async (req, res) => {
-    try {
-        const { userId, packageId } = req.body;
-        
-        const { data: packageData, error: packageError } = await supabase
-            .from('packages')
-            .select('*')
-            .eq('id', packageId)
-            .single();
-        
-        if (packageError || !packageData) {
-            return res.status(400).json({ error: 'Invalid package' });
-        }
-        
-        const { error } = await supabase
-            .from('users')
-            .update({
-                active_package: packageData.name,
-                tap_value: packageData.tap_multiplier * 0.05,
-                max_package_earnings: packageData.max_profit * 1000,
-                package_earnings: 0,
-                unlimited_taps: packageData.unlimited_taps || false
-            })
-            .eq('telegram_id', parseInt(userId));
-        
-        if (error) {
-            throw error;
-        }
-        
-        res.json({
-            success: true,
-            message: `Package ${packageData.name} activated for user ${userId}`
-        });
-    } catch (error) {
-        console.error('Error activating package:', error);
-        res.status(500).json({ error: 'Failed to activate package' });
-    }
-});
-
-// Manual withdrawal processing (for admin use)
-app.post('/api/admin/process-withdrawal', async (req, res) => {
-    try {
-        const { withdrawalId, approve } = req.body;
-        
-        const { data: withdrawal, error: fetchError } = await supabase
-            .from('withdrawals')
-            .select('*')
-            .eq('id', withdrawalId)
-            .single();
-        
-        if (fetchError || !withdrawal) {
-            return res.status(404).json({ error: 'Withdrawal not found' });
-        }
-        
-        if (withdrawal.status !== 'pending') {
-            return res.status(400).json({ error: 'Withdrawal already processed' });
-        }
-        
-        let result = { success: false, error: 'Processing failed' };
-        let newStatus = 'failed';
-        
-        if (approve) {
-            // Process the withdrawal
-            result = await sendTon(withdrawal.wallet_address, withdrawal.amount, `Withdrawal-${withdrawalId}`);
-            newStatus = result.success ? 'completed' : 'failed';
-        } else {
-            // Reject the withdrawal - refund the user
-            const tonPrice = await getTonPrice();
-            const requiredPoints = withdrawal.amount * tonPrice * 1000;
-            
-            const { data: user } = await supabase
-                .from('users')
-                .select('balance')
-                .eq('telegram_id', withdrawal.user_id)
-                .single();
-            
-            if (user) {
-                await supabase
-                    .from('users')
-                    .update({
-                        balance: parseFloat(user.balance) + requiredPoints
-                    })
-                    .eq('telegram_id', withdrawal.user_id);
+            <!-- User Management -->
+            <div class="section">
+                <div class="section-title">👥 User Management</div>
                 
-                // Log refund transaction
+                <!-- Package Assignment Section -->
+                <div class="package-assignment-section">
+                    <h4 style="color: #ffa726; margin-bottom: 15px;">📦 Assign Package to User</h4>
+                    <div class="input-group">
+                        <input type="number" class="form-input" id="packageUserIdInput" placeholder="Telegram User ID">
+                        <select class="form-select" id="packageSelect">
+                            <option value="">Select Package</option>
+                        </select>
+                        <button class="btn btn-warning" onclick="assignPackageToUser()">🎁 Assign Package</button>
+                    </div>
+                    <p style="font-size: 12px; opacity: 0.7; margin-top: 10px;">
+                        ⚠️ Use this feature to manually assign packages to users if the auto-checking system fails.
+                    </p>
+                </div>
+                
+                <div class="input-group">
+                    <input type="text" class="form-input" id="searchUser" placeholder="Search by username or Telegram ID">
+                    <button class="btn btn-primary" onclick="searchUsers()">🔍 Search</button>
+                    <button class="btn btn-success" onclick="loadAllUsers()">📋 Show All Users</button>
+                </div>
+
+                <div class="input-group">
+                    <input type="number" class="form-input" id="userIdInput" placeholder="Telegram User ID">
+                    <input type="number" class="form-input" id="coinsToAdd" placeholder="Coins to add" step="0.01">
+                    <button class="btn btn-success" onclick="addCoins()">💰 Add Coins</button>
+                    <button class="btn btn-danger" onclick="toggleUserBan()">🚫 Ban/Unban User</button>
+                </div>
+
+                <div style="overflow-x: auto;">
+                    <table class="user-table" id="usersTable">
+                        <thead>
+                            <tr>
+                                <th>Telegram ID</th>
+                                <th>Username</th>
+                                <th>Balance</th>
+                                <th>Total Taps</th>
+                                <th>Level</th>
+                                <th>Referrals</th>
+                                <th>Status</th>
+                                <th>Joined</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="usersTableBody">
+                            <tr>
+                                <td colspan="9" style="text-align: center; padding: 20px;">
+                                    Click "Show All Users" to load data
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Withdrawal Management -->
+            <div class="section">
+                <div class="section-title">💳 Withdrawal Management</div>
+                
+                <div id="withdrawalsList">
+                    <p style="text-align: center; opacity: 0.7;">Click "Refresh Withdrawals" to load data</p>
+                </div>
+
+                <div class="input-group">
+                    <button class="btn btn-primary" onclick="loadPendingWithdrawals()">🔄 Refresh Withdrawals</button>
+                    <button class="btn btn-success" onclick="approveAllWithdrawals()">✅ Approve All</button>
+                </div>
+            </div>
+
+            <!-- Package Configuration -->
+            <div class="section">
+                <div class="section-title">📦 Package Configuration</div>
+                
+                <div class="package-config" id="packageConfig">
+                    <p style="text-align: center; opacity: 0.7;">Loading packages...</p>
+                </div>
+
+                <div class="input-group">
+                    <input type="text" class="form-input" id="newPackageName" placeholder="Package Name">
+                    <input type="number" class="form-input" id="newPackagePrice" placeholder="Price ($)" step="0.01">
+                    <input type="number" class="form-input" id="newPackageProfit" placeholder="Max Profit ($)" step="0.01">
+                    <input type="number" class="form-input" id="newPackageTapLimit" placeholder="Daily Tap Limit">
+                    <button class="btn btn-success" onclick="addNewPackage()">➕ Add Package</button>
+                </div>
+            </div>
+
+            <!-- Database Status -->
+            <div class="section">
+                <div class="section-title">📊 Database Status</div>
+                <div id="databaseStatus">
+                    <p>🔄 Checking connection...</p>
+                </div>
+                <div class="input-group">
+                    <button class="btn btn-primary" onclick="testConnection()">🧪 Test Connection</button>
+                    <button class="btn btn-success" onclick="refreshAllData()">🔄 Refresh All Data</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 🔥 YOUR SUPABASE CREDENTIALS (CONFIGURED)
+        const SUPABASE_URL = 'https://arjkzpbhinpqensoqqod.supabase.co';
+        // Using service role key for admin operations to avoid Headers cloning issues
+        const SUPABASE_SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFyamt6cGJoaW5wcWVuc29xcW9kIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NTA2MDAxNSwiZXhwIjoyMDcwNjM2MDE1fQ.dwT80IaEOwk8Gz6qwHD1eZeu6trTCW8krqD0YaAssQU';
+        
+        // Your Telegram ID (ALREADY SET)
+        const ADMIN_TELEGRAM_ID = 6733587823;
+        
+        // Initialize Supabase client
+        let supabase;
+        let isSupabaseConnected = false;
+        
+        // Initialize Telegram Web App
+        const tg = window.Telegram?.WebApp;
+        
+        // Initialize app
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeSupabase();
+            
+            if (tg) {
+                tg.ready();
+                checkAdminAccess();
+            } else {
+                // For testing without Telegram
+                setTimeout(checkAdminAccess, 1000);
+            }
+        });
+
+        function initializeSupabase() {
+            try {
+                if (SUPABASE_URL === 'YOUR_SUPABASE_URL_HERE' || SUPABASE_SERVICE_KEY === 'YOUR_SUPABASE_ANON_KEY_HERE') {
+                    throw new Error('Supabase credentials not configured');
+                }
+                
+                // Using service role key for admin operations with custom options
+                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
+                    auth: {
+                        autoRefreshToken: false,
+                        persistSession: false
+                    },
+                    global: {
+                        headers: {
+                            'X-Client-Info': 'admin-panel'
+                        }
+                    }
+                });
+                isSupabaseConnected = true;
+                console.log('✅ Supabase connected successfully with service role');
+            } catch (error) {
+                console.error('❌ Supabase connection failed:', error);
+                showDatabaseError(error.message);
+            }
+        }
+
+        function showDatabaseError(error) {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('databaseError').style.display = 'block';
+            document.getElementById('errorDetails').textContent = error;
+        }
+
+        function checkAdminAccess() {
+            const loading = document.getElementById('loading');
+            const accessDenied = document.getElementById('accessDenied');
+            const adminPanel = document.getElementById('adminPanel');
+
+            if (!isSupabaseConnected) {
+                return; // Database error already shown
+            }
+
+            try {
+                // Get user data from Telegram
+                const telegramUser = tg?.initDataUnsafe?.user;
+                
+                // 🔧 TEMPORARY: Enable testing mode (CHANGE THIS BEFORE PRODUCTION!)
+                // For testing purposes - remove this line in production
+                const isAdmin = true; // Set to false and uncomment line below for production
+                
+                // For production, uncomment this line and comment the line above:
+                // const isAdmin = telegramUser && telegramUser.id === ADMIN_TELEGRAM_ID;
+
+                console.log('Admin check:', {
+                    telegramUser,
+                    telegramUserId: telegramUser?.id,
+                    adminId: ADMIN_TELEGRAM_ID,
+                    isAdmin
+                });
+
+                setTimeout(() => {
+                    loading.style.display = 'none';
+                    
+                    if (isAdmin) {
+                        adminPanel.style.display = 'block';
+                        loadAdminData().catch(error => {
+                            console.error('Failed to load admin data:', error);
+                            showMessage('Some admin data failed to load. Check console for details.', 'error');
+                        });
+                    } else {
+                        accessDenied.style.display = 'block';
+                    }
+                }, 1500);
+            } catch (error) {
+                console.error('Error in checkAdminAccess:', error);
+                loading.style.display = 'none';
+                accessDenied.style.display = 'block';
+            }
+        }
+
+        async function loadAdminData() {
+            try {
+                // Load data with better error handling
+                const promises = [
+                    loadStats().catch(err => console.warn('Stats loading failed:', err)),
+                    loadPackageConfig().catch(err => console.warn('Package config loading failed:', err)),
+                    loadPackageSelect().catch(err => console.warn('Package select loading failed:', err)),
+                    testConnection().catch(err => console.warn('Connection test failed:', err))
+                ];
+                
+                await Promise.allSettled(promises);
+                console.log('✅ Admin data loading completed');
+                
+            } catch (error) {
+                console.error('Error loading admin data:', error);
+                showMessage('Some admin features may not work properly. Check database connection.', 'error');
+            }
+        }
+
+        async function loadStats() {
+            try {
+                // Get total users
+                const { data: users, error: usersError } = await supabase
+                    .from('users')
+                    .select('*');
+                
+                if (usersError) throw usersError;
+
+                // Get total revenue from packages
+                const { data: packages, error: packagesError } = await supabase
+                    .from('user_packages')
+                    .select(`
+                        *,
+                        packages (price)
+                    `);
+                
+                if (packagesError) throw packagesError;
+
+                // Get withdrawals
+                const { data: withdrawals, error: withdrawalsError } = await supabase
+                    .from('withdrawals')
+                    .select('*');
+                
+                if (withdrawalsError) throw withdrawalsError;
+
+                // Update stats
+                document.getElementById('totalUsers').textContent = users?.length || 0;
+                
+                const totalRevenue = packages?.reduce((sum, pkg) => sum + (pkg.packages?.price || 0), 0) || 0;
+                document.getElementById('totalRevenue').textContent = '$' + totalRevenue.toFixed(2);
+                
+                const totalTaps = users?.reduce((sum, user) => sum + (user.total_taps || 0), 0) || 0;
+                document.getElementById('totalTaps').textContent = totalTaps.toLocaleString();
+                
+                const activePackages = packages?.filter(pkg => pkg.is_active).length || 0;
+                document.getElementById('activePackages').textContent = activePackages;
+                
+                const pendingWithdrawals = withdrawals?.filter(w => w.status === 'pending').length || 0;
+                document.getElementById('pendingWithdrawals').textContent = pendingWithdrawals;
+                
+                const totalReferrals = users?.reduce((sum, user) => sum + (user.referral_count || 0), 0) || 0;
+                document.getElementById('totalReferrals').textContent = totalReferrals;
+
+            } catch (error) {
+                console.error('Error loading stats:', error);
+                showMessage('Failed to load statistics', 'error');
+            }
+        }
+
+        async function loadPackageSelect() {
+            try {
+                const { data: packages, error } = await supabase
+                    .from('packages')
+                    .select('*')
+                    .eq('is_active', true)
+                    .order('price', { ascending: true });
+                
+                if (error) throw error;
+
+                const select = document.getElementById('packageSelect');
+                select.innerHTML = '<option value="">Select Package</option>';
+                
+                packages.forEach(pkg => {
+                    const option = document.createElement('option');
+                    option.value = pkg.id;
+                    option.textContent = `${pkg.name} - $${parseFloat(pkg.price).toFixed(2)}`;
+                    select.appendChild(option);
+                });
+
+            } catch (error) {
+                console.error('Error loading package select:', error);
+            }
+        }
+
+        async function assignPackageToUser() {
+            try {
+                const userId = document.getElementById('packageUserIdInput').value;
+                const packageId = document.getElementById('packageSelect').value;
+                
+                if (!userId || !packageId) {
+                    showMessage('Please enter User ID and select a package!', 'error');
+                    return;
+                }
+
+                showMessage('Assigning package...', 'info');
+
+                // First check if user exists
+                const { data: user, error: getUserError } = await supabase
+                    .from('users')
+                    .select('telegram_id, username')
+                    .eq('telegram_id', userId)
+                    .single();
+
+                if (getUserError || !user) {
+                    throw new Error('User not found');
+                }
+
+                // Get package details
+                const { data: packageData, error: getPackageError } = await supabase
+                    .from('packages')
+                    .select('*')
+                    .eq('id', packageId)
+                    .single();
+
+                if (getPackageError || !packageData) {
+                    throw new Error('Package not found');
+                }
+
+                // Check if user already has this package
+                const { data: existingPackage, error: checkError } = await supabase
+                    .from('user_packages')
+                    .select('*')
+                    .eq('user_id', userId)
+                    .eq('package_id', packageId)
+                    .eq('is_active', true);
+
+                if (checkError) throw checkError;
+
+                if (existingPackage && existingPackage.length > 0) {
+                    showMessage('User already has this package active!', 'error');
+                    return;
+                }
+
+                // Calculate expiry date
+                const purchaseDate = new Date();
+                const expiryDate = new Date(purchaseDate);
+                expiryDate.setDate(expiryDate.getDate() + packageData.duration_days);
+
+                // Assign package to user
+                const { error: assignError } = await supabase
+                    .from('user_packages')
+                    .insert({
+                        user_id: userId,
+                        package_id: packageId,
+                        purchase_date: purchaseDate.toISOString(),
+                        expiry_date: expiryDate.toISOString(),
+                        is_active: true,
+                        remaining_profit: packageData.max_profit,
+                        daily_taps_used: 0,
+                        created_at: new Date().toISOString()
+                    });
+
+                if (assignError) throw assignError;
+
+                // Log admin action
+                await supabase
+                    .from('admin_logs')
+                    .insert({
+                        admin_telegram_id: ADMIN_TELEGRAM_ID,
+                        action: 'assign_package',
+                        target_user_id: userId,
+                        details: {
+                            package_id: packageId,
+                            package_name: packageData.name,
+                            package_price: packageData.price,
+                            assigned_manually: true
+                        }
+                    });
+
+                showMessage(`✅ Package "${packageData.name}" assigned to ${user.username || userId}!`, 'success');
+                
+                // Clear inputs
+                document.getElementById('packageUserIdInput').value = '';
+                document.getElementById('packageSelect').value = '';
+                
+                // Refresh stats
+                await loadStats();
+                
+            } catch (error) {
+                console.error('Error assigning package:', error);
+                showMessage('Failed to assign package: ' + error.message, 'error');
+            }
+        }
+
+        async function loadAllUsers() {
+            try {
+                showMessage('Loading users...', 'info');
+                
+                const { data: users, error } = await supabase
+                    .from('users')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+                
+                if (error) throw error;
+
+                displayUsers(users || []);
+                
+            } catch (error) {
+                console.error('Error loading users:', error);
+                showMessage('Failed to load users: ' + error.message, 'error');
+            }
+        }
+
+        function displayUsers(users) {
+            const tbody = document.getElementById('usersTableBody');
+            tbody.innerHTML = '';
+
+            if (users.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px;">No users found</td></tr>';
+                return;
+            }
+
+            users.forEach(user => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${user.telegram_id}</td>
+                    <td>${user.username || 'N/A'}</td>
+                    <td>${parseFloat(user.balance || 0).toFixed(2)}</td>
+                    <td>${user.total_taps || 0}</td>
+                    <td>${user.level || 1}</td>
+                    <td>${user.referral_count || 0}</td>
+                    <td><span style="color: ${user.is_banned ? '#ff4757' : '#2ed573'}">${user.is_banned ? 'BANNED' : 'ACTIVE'}</span></td>
+                    <td>${new Date(user.created_at).toLocaleDateString()}</td>
+                    <td>
+                        <button class="btn btn-primary" onclick="viewUserDetails(${user.telegram_id})">👁️</button>
+                        <button class="btn btn-${user.is_banned ? 'success' : 'danger'}" onclick="toggleUserBan(${user.telegram_id})">
+                            ${user.is_banned ? '✅' : '🚫'}
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        async function searchUsers() {
+            try {
+                const searchTerm = document.getElementById('searchUser').value.trim();
+                
+                if (!searchTerm) {
+                    await loadAllUsers();
+                    return;
+                }
+
+                showMessage('Searching users...', 'info');
+                
+                const { data: users, error } = await supabase
+                    .from('users')
+                    .select('*')
+                    .or(`username.ilike.%${searchTerm}%,telegram_id.eq.${searchTerm}`)
+                    .order('created_at', { ascending: false });
+                
+                if (error) throw error;
+
+                displayUsers(users || []);
+                
+            } catch (error) {
+                console.error('Error searching users:', error);
+                showMessage('Search failed: ' + error.message, 'error');
+            }
+        }
+
+        async function addCoins() {
+            try {
+                const userId = document.getElementById('userIdInput').value;
+                const coinsToAdd = parseFloat(document.getElementById('coinsToAdd').value);
+                
+                if (!userId || !coinsToAdd || coinsToAdd <= 0) {
+                    showMessage('Please enter valid User ID and positive amount!', 'error');
+                    return;
+                }
+
+                showMessage('Adding coins...', 'info');
+
+                // First get current balance
+                const { data: user, error: getUserError } = await supabase
+                    .from('users')
+                    .select('balance, username')
+                    .eq('telegram_id', userId)
+                    .single();
+
+                if (getUserError || !user) {
+                    throw new Error('User not found');
+                }
+
+                // Update balance
+                const newBalance = parseFloat(user.balance || 0) + coinsToAdd;
+                
+                const { error: updateError } = await supabase
+                    .from('users')
+                    .update({ 
+                        balance: newBalance,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('telegram_id', userId);
+
+                if (updateError) throw updateError;
+
+                // Log the transaction
                 await supabase
                     .from('transactions')
                     .insert({
-                        user_id: withdrawal.user_id,
-                        type: 'withdrawal_refund',
-                        amount: requiredPoints,
-                        description: `Refund for rejected withdrawal ${withdrawalId}`
+                        user_id: userId,
+                        type: 'admin_add',
+                        amount: coinsToAdd,
+                        description: `Admin added ${coinsToAdd} coins`
                     });
+
+                // Log admin action
+                await supabase
+                    .from('admin_logs')
+                    .insert({
+                        admin_telegram_id: ADMIN_TELEGRAM_ID,
+                        action: 'add_coins',
+                        target_user_id: userId,
+                        details: {
+                            amount: coinsToAdd,
+                            old_balance: user.balance,
+                            new_balance: newBalance
+                        }
+                    });
+
+                showMessage(`✅ Added ${coinsToAdd} to ${user.username || userId}'s account!`, 'success');
+                
+                // Clear inputs
+                document.getElementById('userIdInput').value = '';
+                document.getElementById('coinsToAdd').value = '';
+                
+                // Refresh user list
+                await loadAllUsers();
+                
+            } catch (error) {
+                console.error('Error adding coins:', error);
+                showMessage('Failed to add coins: ' + error.message, 'error');
             }
-            
-            newStatus = 'rejected';
-            result = { success: true, message: 'Withdrawal rejected and refunded' };
         }
-        
-        // Update withdrawal status
-        const updateData = {
-            status: newStatus,
-            processed_date: new Date().toISOString()
-        };
-        
-        if (result.txHash) {
-            updateData.transaction_hash = result.txHash;
-        }
-        
-        if (result.error) {
-            updateData.error_message = result.error;
-        }
-        
-        const { error: updateError } = await supabase
-            .from('withdrawals')
-            .update(updateData)
-            .eq('id', withdrawalId);
-        
-        if (updateError) {
-            throw updateError;
-        }
-        
-        res.json({
-            success: true,
-            withdrawal: {
-                ...withdrawal,
-                ...updateData
-            },
-            message: result.success ? 
-                (approve ? 'Withdrawal processed successfully' : 'Withdrawal rejected and refunded') :
-                'Withdrawal processing failed'
-        });
-    } catch (error) {
-        console.error('Error processing withdrawal:', error);
-        res.status(500).json({ error: 'Failed to process withdrawal' });
-    }
-});
 
-// Get all withdrawals (admin)
-app.get('/api/admin/withdrawals', async (req, res) => {
-    try {
-        const { data: withdrawals, error } = await supabase
-            .from('withdrawals')
-            .select(`
-                *,
-                users!withdrawals_user_id_fkey (
-                    telegram_id,
-                    username,
-                    first_name
-                )
-            `)
-            .order('request_date', { ascending: false })
-            .limit(50);
-        
-        if (error) {
-            throw error;
-        }
-        
-        res.json(withdrawals || []);
-    } catch (error) {
-        console.error('Error getting withdrawals:', error);
-        res.status(500).json({ error: 'Failed to get withdrawals' });
-    }
-});
+        async function toggleUserBan(userTelegramId = null) {
+            try {
+                const userId = userTelegramId || document.getElementById('userIdInput').value;
+                
+                if (!userId) {
+                    showMessage('Please enter User ID!', 'error');
+                    return;
+                }
 
-// Get all users (admin)
-app.get('/api/admin/users', async (req, res) => {
-    try {
-        const { data: users, error } = await supabase
-            .from('users')
-            .select('*')
-            .order('created_at', { ascending: false })
-            .limit(100);
-        
-        if (error) {
-            throw error;
-        }
-        
-        res.json(users || []);
-    } catch (error) {
-        console.error('Error getting users:', error);
-        res.status(500).json({ error: 'Failed to get users' });
-    }
-});
+                showMessage('Updating user status...', 'info');
 
-// Add points to user (admin)
-app.post('/api/admin/add-points', async (req, res) => {
-    try {
-        const { userId, amount, description } = req.body;
-        
-        if (!userId || !amount) {
-            return res.status(400).json({ error: 'Missing required fields' });
+                // Get current user status
+                const { data: user, error: getUserError } = await supabase
+                    .from('users')
+                    .select('is_banned, username')
+                    .eq('telegram_id', userId)
+                    .single();
+
+                if (getUserError || !user) {
+                    throw new Error('User not found');
+                }
+
+                const newStatus = !user.is_banned;
+                
+                // Update user status
+                const { error: updateError } = await supabase
+                    .from('users')
+                    .update({ 
+                        is_banned: newStatus,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('telegram_id', userId);
+
+                if (updateError) throw updateError;
+
+                // Log admin action
+                await supabase
+                    .from('admin_logs')
+                    .insert({
+                        admin_telegram_id: ADMIN_TELEGRAM_ID,
+                        action: newStatus ? 'ban_user' : 'unban_user',
+                        target_user_id: userId,
+                        details: {
+                            previous_status: user.is_banned,
+                            new_status: newStatus
+                        }
+                    });
+
+                showMessage(`✅ User ${user.username || userId} has been ${newStatus ? 'banned' : 'unbanned'}!`, 'success');
+                
+                // Clear input if used
+                if (!userTelegramId) {
+                    document.getElementById('userIdInput').value = '';
+                }
+                
+                // Refresh user list
+                await loadAllUsers();
+                
+            } catch (error) {
+                console.error('Error toggling user ban:', error);
+                showMessage('Failed to update user status: ' + error.message, 'error');
+            }
         }
-        
-        const { data: user, error: fetchError } = await supabase
-            .from('users')
-            .select('balance')
-            .eq('telegram_id', parseInt(userId))
-            .single();
-        
-        if (fetchError || !user) {
-            return res.status(404).json({ error: 'User not found' });
+
+        async function loadPendingWithdrawals() {
+            try {
+                showMessage('Loading withdrawals...', 'info');
+                
+                const { data: withdrawals, error } = await supabase
+                    .from('withdrawals')
+                    .select(`
+                        *,
+                        users!withdrawals_user_id_fkey (username)
+                    `)
+                    .eq('status', 'pending')
+                    .order('request_date', { ascending: false });
+                
+                if (error) throw error;
+
+                displayWithdrawals(withdrawals || []);
+                
+            } catch (error) {
+                console.error('Error loading withdrawals:', error);
+                showMessage('Failed to load withdrawals: ' + error.message, 'error');
+            }
         }
-        
-        const newBalance = parseFloat(user.balance) + parseFloat(amount);
-        
-        const { error: updateError } = await supabase
-            .from('users')
-            .update({ balance: newBalance })
-            .eq('telegram_id', parseInt(userId));
-        
-        if (updateError) {
-            throw updateError;
-        }
-        
-        // Log transaction
-        await supabase
-            .from('transactions')
-            .insert({
-                user_id: parseInt(userId),
-                type: 'admin_adjustment',
-                amount: parseFloat(amount),
-                description: description || `Admin added ${amount} points`
+
+        function displayWithdrawals(withdrawals) {
+            const container = document.getElementById('withdrawalsList');
+            container.innerHTML = '';
+
+            if (withdrawals.length === 0) {
+                container.innerHTML = '<p style="text-align: center; opacity: 0.7;">No pending withdrawals</p>';
+                return;
+            }
+
+            withdrawals.forEach(withdrawal => {
+                const card = document.createElement('div');
+                card.className = 'withdrawal-card';
+                card.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                        <div>
+                            <strong>${withdrawal.users?.username || 'Unknown'}</strong> (ID: ${withdrawal.user_id})<br>
+                            Amount: <strong>${parseFloat(withdrawal.amount).toFixed(2)}</strong><br>
+                            Wallet: <code style="word-break: break-all;">${withdrawal.wallet_address}</code><br>
+                            <small>Requested: ${new Date(withdrawal.request_date).toLocaleString()}</small>
+                        </div>
+                        <div>
+                            <button class="btn btn-success" onclick="approveWithdrawal(${withdrawal.id})">✅ Approve</button>
+                            <button class="btn btn-danger" onclick="rejectWithdrawal(${withdrawal.id})">❌ Reject</button>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
             });
-        
-        res.json({
-            success: true,
-            message: `Added ${amount} points to user ${userId}`,
-            newBalance: newBalance
-        });
-    } catch (error) {
-        console.error('Error adding points:', error);
-        res.status(500).json({ error: 'Failed to add points' });
-    }
-});
-
-// Get user transactions
-app.get('/api/transactions/:userId', async (req, res) => {
-    try {
-        const userId = parseInt(req.params.userId);
-        const limit = parseInt(req.query.limit) || 50;
-        
-        const { data: transactions, error } = await supabase
-            .from('transactions')
-            .select('*')
-            .eq('user_id', userId)
-            .order('created_at', { ascending: false })
-            .limit(limit);
-        
-        if (error) {
-            throw error;
         }
-        
-        res.json(transactions || []);
-    } catch (error) {
-        console.error('Error getting transactions:', error);
-        res.status(500).json({ error: 'Failed to get transactions' });
-    }
-});
 
-// Webhook for TON payments (if using TON payment processor)
-app.post('/api/webhook/ton', async (req, res) => {
-    try {
-        const { transaction, status, user_id, package_id } = req.body;
-        
-        if (status === 'confirmed') {
-            console.log('TON payment confirmed:', transaction);
-            
-            // If it's a package purchase
-            if (user_id && package_id) {
-                const { data: packageData } = await supabase
+        async function approveWithdrawal(withdrawalId) {
+            try {
+                if (!confirm('Are you sure you want to approve this withdrawal?')) return;
+
+                showMessage('Approving withdrawal...', 'info');
+                
+                const { error } = await supabase
+                    .from('withdrawals')
+                    .update({ 
+                        status: 'approved',
+                        processed_date: new Date().toISOString()
+                    })
+                    .eq('id', withdrawalId);
+
+                if (error) throw error;
+
+                showMessage('✅ Withdrawal approved successfully!', 'success');
+                await loadPendingWithdrawals();
+                
+            } catch (error) {
+                console.error('Error approving withdrawal:', error);
+                showMessage('Failed to approve withdrawal: ' + error.message, 'error');
+            }
+        }
+
+        async function rejectWithdrawal(withdrawalId) {
+            try {
+                const reason = prompt('Reason for rejection (optional):');
+                
+                if (!confirm('Are you sure you want to reject this withdrawal?')) return;
+
+                showMessage('Rejecting withdrawal...', 'info');
+                
+                const { error } = await supabase
+                    .from('withdrawals')
+                    .update({ 
+                        status: 'rejected',
+                        processed_date: new Date().toISOString(),
+                        admin_notes: reason
+                    })
+                    .eq('id', withdrawalId);
+
+                if (error) throw error;
+
+                showMessage('❌ Withdrawal rejected successfully!', 'success');
+                await loadPendingWithdrawals();
+                
+            } catch (error) {
+                console.error('Error rejecting withdrawal:', error);
+                showMessage('Failed to reject withdrawal: ' + error.message, 'error');
+            }
+        }
+
+        async function approveAllWithdrawals() {
+            try {
+                if (!confirm('Are you sure you want to approve ALL pending withdrawals?')) return;
+
+                showMessage('Approving all withdrawals...', 'info');
+                
+                const { error } = await supabase
+                    .from('withdrawals')
+                    .update({ 
+                        status: 'approved',
+                        processed_date: new Date().toISOString()
+                    })
+                    .eq('status', 'pending');
+
+                if (error) throw error;
+
+                showMessage('✅ All withdrawals approved!', 'success');
+                await loadPendingWithdrawals();
+                
+            } catch (error) {
+                console.error('Error approving all withdrawals:', error);
+                showMessage('Failed to approve withdrawals: ' + error.message, 'error');
+            }
+        }
+
+        async function loadPackageConfig() {
+            try {
+                const { data: packages, error } = await supabase
                     .from('packages')
                     .select('*')
-                    .eq('id', package_id)
-                    .single();
+                    .order('price', { ascending: true });
                 
-                if (packageData) {
-                    // Activate package for user
-                    await supabase
-                        .from('users')
-                        .update({
-                            active_package: packageData.name,
-                            tap_value: packageData.tap_multiplier * 0.05,
-                            max_package_earnings: packageData.max_profit * 1000,
-                            package_earnings: 0,
-                            unlimited_taps: packageData.unlimited_taps || false
-                        })
-                        .eq('telegram_id', parseInt(user_id));
-                    
-                    // Log transaction
-                    await supabase
-                        .from('transactions')
-                        .insert({
-                            user_id: parseInt(user_id),
-                            type: 'package_purchase',
-                            amount: -packageData.price * 1000,
-                            description: `Purchased ${packageData.name} package`,
-                            metadata: { 
-                                package_id: package_id, 
-                                transaction_hash: transaction.hash,
-                                confirmed: true
-                            }
-                        });
+                if (error) throw error;
+
+                displayPackages(packages || []);
+                
+            } catch (error) {
+                console.error('Error loading packages:', error);
+                showMessage('Failed to load packages: ' + error.message, 'error');
+            }
+        }
+
+        function displayPackages(packages) {
+            const container = document.getElementById('packageConfig');
+            container.innerHTML = '';
+
+            if (packages.length === 0) {
+                container.innerHTML = '<p style="text-align: center; opacity: 0.7;">No packages found</p>';
+                return;
+            }
+
+            packages.forEach(pkg => {
+                const card = document.createElement('div');
+                card.className = 'package-card';
+                card.innerHTML = `
+                    <h4>${pkg.name}</h4>
+                    <p><strong>Price:</strong> ${parseFloat(pkg.price).toFixed(2)}</p>
+                    <p><strong>Max Profit:</strong> ${parseFloat(pkg.max_profit).toFixed(2)}</p>
+                    <p><strong>Duration:</strong> ${pkg.duration_days} days</p>
+                    <p><strong>Daily Tap Limit:</strong> ${pkg.daily_tap_limit}</p>
+                    <p><strong>Status:</strong> <span style="color: ${pkg.is_active ? '#2ed573' : '#ff4757'}">${pkg.is_active ? 'Active' : 'Inactive'}</span></p>
+                    <div style="margin-top: 15px;">
+                        <button class="btn btn-primary" onclick="editPackage(${pkg.id})">✏️ Edit</button>
+                        <button class="btn btn-${pkg.is_active ? 'danger' : 'success'}" onclick="togglePackage(${pkg.id})">
+                            ${pkg.is_active ? '🚫 Disable' : '✅ Enable'}
+                        </button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        async function addNewPackage() {
+            try {
+                const name = document.getElementById('newPackageName').value.trim();
+                const price = parseFloat(document.getElementById('newPackagePrice').value);
+                const profit = parseFloat(document.getElementById('newPackageProfit').value);
+                const tapLimit = parseInt(document.getElementById('newPackageTapLimit').value);
+
+                if (!name || !price || !profit || !tapLimit) {
+                    showMessage('Please fill in all package details!', 'error');
+                    return;
+                }
+
+                showMessage('Creating package...', 'info');
+
+                const { error } = await supabase
+                    .from('packages')
+                    .insert({
+                        name: name,
+                        price: price,
+                        max_profit: profit,
+                        daily_tap_limit: tapLimit,
+                        duration_days: 30,
+                        is_active: true
+                    });
+
+                if (error) throw error;
+
+                showMessage(`✅ Package "${name}" created successfully!`, 'success');
+                
+                // Clear inputs
+                document.getElementById('newPackageName').value = '';
+                document.getElementById('newPackagePrice').value = '';
+                document.getElementById('newPackageProfit').value = '';
+                document.getElementById('newPackageTapLimit').value = '';
+                
+                await loadPackageConfig();
+                
+            } catch (error) {
+                console.error('Error creating package:', error);
+                showMessage('Failed to create package: ' + error.message, 'error');
+            }
+        }
+
+        async function togglePackage(packageId) {
+            try {
+                // Get current package status
+                const { data: pkg, error: getError } = await supabase
+                    .from('packages')
+                    .select('is_active, name')
+                    .eq('id', packageId)
+                    .single();
+
+                if (getError || !pkg) throw new Error('Package not found');
+
+                const newStatus = !pkg.is_active;
+                
+                const { error } = await supabase
+                    .from('packages')
+                    .update({ 
+                        is_active: newStatus,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', packageId);
+
+                if (error) throw error;
+
+                showMessage(`✅ Package "${pkg.name}" ${newStatus ? 'enabled' : 'disabled'}!`, 'success');
+                await loadPackageConfig();
+                
+            } catch (error) {
+                console.error('Error toggling package:', error);
+                showMessage('Failed to update package: ' + error.message, 'error');
+            }
+        }
+
+        async function editPackage(packageId) {
+            try {
+                // Get current package data
+                const { data: pkg, error: getError } = await supabase
+                    .from('packages')
+                    .select('*')
+                    .eq('id', packageId)
+                    .single();
+
+                if (getError || !pkg) throw new Error('Package not found');
+
+                const newName = prompt(`Enter new name for ${pkg.name}:`, pkg.name);
+                if (!newName) return;
+
+                const newPrice = prompt(`Enter new price for ${pkg.name}:`, pkg.price);
+                if (!newPrice) return;
+
+                const newProfit = prompt(`Enter new max profit for ${pkg.name}:`, pkg.max_profit);
+                if (!newProfit) return;
+
+                const newTapLimit = prompt(`Enter new daily tap limit for ${pkg.name}:`, pkg.daily_tap_limit);
+                if (!newTapLimit) return;
+
+                showMessage('Updating package...', 'info');
+
+                const { error } = await supabase
+                    .from('packages')
+                    .update({ 
+                        name: newName,
+                        price: parseFloat(newPrice),
+                        max_profit: parseFloat(newProfit),
+                        daily_tap_limit: parseInt(newTapLimit),
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', packageId);
+
+                if (error) throw error;
+
+                showMessage(`✅ Package updated successfully!`, 'success');
+                await loadPackageConfig();
+                
+            } catch (error) {
+                console.error('Error editing package:', error);
+                showMessage('Failed to edit package: ' + error.message, 'error');
+            }
+        }
+
+        // 🔧 FIXED: Corrected testConnection function - this was causing the loading issue
+        async function testConnection() {
+            try {
+                // Simple connection test - just select first user
+                const { data, error } = await supabase
+                    .from('users')
+                    .select('telegram_id')
+                    .limit(1);
+                
+                if (error) {
+                    // If users table doesn't exist, try a different approach
+                    if (error.code === 'PGRST116') {
+                        // Table doesn't exist, but connection works
+                        document.getElementById('databaseStatus').innerHTML = `
+                            <p style="color: #ffa726;">⚠️ Database connected but tables may not exist!</p>
+                            <p><small>Connection test completed at ${new Date().toLocaleString()}</small></p>
+                            <p><small>Please set up your database tables first.</small></p>
+                        `;
+                        return;
+                    }
+                    throw error;
+                }
+                
+                document.getElementById('databaseStatus').innerHTML = `
+                    <p style="color: #2ed573;">✅ Database connected successfully!</p>
+                    <p><small>Connection test completed at ${new Date().toLocaleString()}</small></p>
+                    <p><small>Found ${data ? data.length : 0} records in users table.</small></p>
+                `;
+                
+            } catch (error) {
+                console.error('Connection test failed:', error);
+                document.getElementById('databaseStatus').innerHTML = `
+                    <p style="color: #ff4757;">❌ Database connection failed!</p>
+                    <p><small>Error: ${error.message}</small></p>
+                    <p><small>Code: ${error.code || 'Unknown'}</small></p>
+                `;
+                
+                // Show database error screen if connection completely fails
+                if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                    showDatabaseError('Network connection failed. Please check your internet connection.');
                 }
             }
         }
-        
-        res.json({ success: true });
-    } catch (error) {
-        console.error('Webhook error:', error);
-        res.status(500).json({ error: 'Webhook processing failed' });
-    }
-});
 
-// Health check endpoint
-app.get('/api/health', (req, res) => {
-    res.json({
-        status: 'ok',
-        timestamp: new Date().toISOString(),
-        uptime: process.uptime(),
-        memory: process.memoryUsage(),
-        database: 'supabase'
-    });
-});
+        async function refreshAllData() {
+            showMessage('Refreshing all data...', 'info');
+            await loadAdminData();
+            showMessage('✅ All data refreshed!', 'success');
+        }
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-    console.error('Unhandled error:', err);
-    res.status(500).json({ error: 'Internal server error' });
-});
+        async function viewUserDetails(userId) {
+            try {
+                const { data: user, error } = await supabase
+                    .from('users')
+                    .select(`
+                        *,
+                        user_packages!user_packages_user_id_fkey (
+                            *,
+                            packages (name, price)
+                        )
+                    `)
+                    .eq('telegram_id', userId)
+                    .single();
+                
+                if (error || !user) throw new Error('User not found');
 
-// 404 handler
-app.use((req, res) => {
-    res.status(404).json({ error: 'Endpoint not found' });
-});
+                const activePackages = user.user_packages?.filter(up => up.is_active) || [];
+                const totalInvested = user.user_packages?.reduce((sum, up) => sum + (up.packages?.price || 0), 0) || 0;
 
-// Start server
-app.listen(PORT, () => {
-    console.log(`🚀 Tap to Earn Bot server running on port ${PORT}`);
-    console.log(`📱 Bot: @Taptoearnofficial_bot`);
-    console.log(`💰 Owner Wallet: ${OWNER_WALLET}`);
-    console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`🗄️  Database: Supabase Connected`);
-    console.log(`📊 Supabase URL: ${process.env.SUPABASE_URL}`);
-    
-    // Load initial TON price
-    getTonPrice().then(price => {
-        console.log(`💎 Current TON Price: ${price}`);
-    }).catch(err => {
-        console.error('Failed to load TON price:', err);
-    });
-});
+                const details = `
+👤 User Details:
+━━━━━━━━━━━━━━━━━
+Telegram ID: ${user.telegram_id}
+Username: ${user.username || 'N/A'}
+Name: ${user.first_name || ''} ${user.last_name || ''}
+Balance: ${parseFloat(user.balance || 0).toFixed(2)}
+Total Taps: ${user.total_taps || 0}
+Energy: ${user.energy || 0}/${user.max_energy || 0}
+Level: ${user.level || 1}
+Total Invested: ${totalInvested.toFixed(2)}
+Active Packages: ${activePackages.length}
+Referrals: ${user.referral_count || 0}
+Wallet: ${user.wallet_address || 'Not set'}
+Status: ${user.is_banned ? 'BANNED' : 'ACTIVE'}
+Joined: ${new Date(user.created_at).toLocaleString()}
+Last Active: ${new Date(user.last_active || user.created_at).toLocaleString()}
+━━━━━━━━━━━━━━━━━
+                `.trim();
+                
+                alert(details);
+                
+            } catch (error) {
+                console.error('Error getting user details:', error);
+                showMessage('Failed to load user details: ' + error.message, 'error');
+            }
+        }
+
+        // Helper function to show messages
+        function showMessage(message, type = 'success') {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = type === 'success' ? 'success-message' : (type === 'error' ? 'error-message' : 'success-message');
+            messageDiv.textContent = message;
+            messageDiv.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 15px 20px;
+                border-radius: 8px;
+                font-weight: bold;
+                z-index: 9999;
+                animation: slideIn 0.3s ease-out;
+                max-width: 300px;
+            `;
+            
+            // Override color for info messages
+            if (type === 'info') {
+                messageDiv.style.background = 'rgba(0, 212, 255, 0.2)';
+                messageDiv.style.border = '1px solid #00d4ff';
+                messageDiv.style.color = '#00d4ff';
+            }
+            
+            document.body.appendChild(messageDiv);
+            
+            setTimeout(() => {
+                messageDiv.remove();
+            }, 3000);
+        }
+
+        // Add CSS animation for messages
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes slideIn {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+        `;
+        document.head.appendChild(style);
+    </script>
+</body>
+</html>
