@@ -708,7 +708,6 @@
                         is_active: true,
                         remaining_profit: parseFloat(packageData.max_profit),
                         daily_taps_used: 0,
-                        created_at: new Date().toISOString()
                     });
 
                 if (assignError) throw assignError;
@@ -854,7 +853,6 @@
                                 energy: 100,
                                 max_energy: 100,
                                 level: 1,
-                                created_at: new Date().toISOString()
                             });
 
                         if (createUserError) throw createUserError;
@@ -885,31 +883,27 @@
                 if (updateError) throw updateError;
 
                 // Log the transaction
-                await supabase
-                    .from('transactions')
-                    .insert({
-                        user_id: parseInt(userId),
-                        type: 'admin_add',
-                        amount: coinsToAdd,
-                        description: `Admin added ${coinsToAdd} coins`,
-                        created_at: new Date().toISOString()
-                    });
-
+               // .from('transactions')
+                // .insert({
+                 //     user_id: parseInt(userId),
+               //     type: 'admin_add',
+               //     amount: coinsToAdd,
+               //     description: `Admin added ${coinsToAdd} coins`,
+               //     created_at: new Date().toISOString()
+               // });
                 // Log admin action
-                await supabase
-                    .from('admin_logs')
-                    .insert({
-                        admin_telegram_id: ADMIN_TELEGRAM_ID,
-                        action: 'add_coins',
-                        target_user_id: parseInt(userId),
-                        details: {
-                            amount: coinsToAdd,
-                            old_balance: user.balance,
-                            new_balance: newBalance
-                        }
-                    });
-
-                showMessage(`✅ Added $${coinsToAdd} to ${user.username || userId}'s account!`, 'success');
+// await supabase
+//     .from('admin_logs')
+//     .insert({
+//         admin_telegram_id: ADMIN_TELEGRAM_ID,
+//         action: 'add_coins',
+//         target_user_id: parseInt(userId),
+//         details: {
+//             amount: coinsToAdd,
+//             old_balance: user.balance,
+//             new_balance: newBalance
+//         }
+//     });
                 
                 // Clear inputs
                 document.getElementById('userIdInput').value = '';
