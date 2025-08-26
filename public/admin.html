@@ -1309,9 +1309,8 @@
                 // Simple connection test
                 const { data, error } = await supabase
                     .from('app_users')
-                    .select('count(*)', { count: 'exact' })
-                    .limit(0);
-                
+                    .select ('telegram_id')
+                    .limit(1);
                 if (error) {
                     if (error.code === 'PGRST116') {
 
