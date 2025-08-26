@@ -558,7 +558,7 @@
             try {
                 // FIXED: Better error handling and queries
                 const [usersResult, packagesResult, withdrawalsResult] = await Promise.allSettled([
-                    supabase.from('users').select('*'),
+                    supabase.from('app_users').select('*'),
                     supabase.from('user_packages').select(`*, packages(price)`),
                     supabase.from('withdrawals').select('*')
                 ]);
@@ -636,7 +636,7 @@
 
                 // FIXED: Check if user exists first, create if not
                 let { data: user, error: getUserError } = await supabase
-                    .from('users')
+                    .from('app_users')
                     .select('telegram_id, username')
                     .eq('telegram_id', userId)
                     .single();
@@ -645,7 +645,7 @@
                     if (getUserError.code === 'PGRST116') {
                         // User doesn't exist, create them
                         const { error: createUserError } = await supabase
-                            .from('users')
+                            .from('app_users')
                             .insert({
                                 telegram_id: parseInt(userId),
                                 username: `user_${userId}`,
@@ -747,7 +747,7 @@
                 showMessage('Loading users...', 'info');
                 
                 const { data: users, error } = await supabase
-                    .from('users')
+                    .from('app_users')
                     .select('*')
                     .order('created_at', { ascending: false });
                 
@@ -805,7 +805,7 @@
                 showMessage('Searching users...', 'info');
                 
                 const { data: users, error } = await supabase
-                    .from('users')
+                    .from('app_users')
                     .select('*')
                     .or(`username.ilike.%${searchTerm}%,telegram_id.eq.${searchTerm}`)
                     .order('created_at', { ascending: false });
@@ -835,7 +835,7 @@
 
                 // FIXED: Get current balance with better error handling
                 let { data: user, error: getUserError } = await supabase
-                    .from('users')
+                    .from('app_users')
                     .select('balance, username')
                     .eq('telegram_id', userId)
                     .single();
@@ -844,7 +844,7 @@
                     if (getUserError.code === 'PGRST116') {
                         // User doesn't exist, create them first
                         const { error: createUserError } = await supabase
-                            .from('users')
+                            .from('app_users')
                             .insert({
                                 telegram_id: parseInt(userId),
                                 username: `user_${userId}`,
@@ -873,7 +873,7 @@
                 const newBalance = parseFloat(user.balance || 0) + coinsToAdd;
                 
                 const { error: updateError } = await supabase
-                    .from('users')
+                    .from('app_users')
                     .update({ 
                         balance: newBalance,
                         updated_at: new Date().toISOString()
@@ -934,7 +934,7 @@
 
                 // Get current user status
                 const { data: user, error: getUserError } = await supabase
-                    .from('users')
+                    .from('app_users')
                     .select('is_banned, username')
                     .eq('telegram_id', userId)
                     .single();
@@ -947,7 +947,7 @@
                 
                 // Update user status
                 const { error: updateError } = await supabase
-                    .from('users')
+                    .from('app_users')
                     .update({ 
                         is_banned: newStatus,
                         updated_at: new Date().toISOString()
@@ -996,7 +996,7 @@
                     .from('withdrawals')
                     .select(`
                         *,
-                        users!withdrawals_user_id_fkey (username)
+                        app_users!withdrawals_user_id_fkey (username)
                     `)
                     .eq('status', 'pending')
                     .order('request_date', { ascending: false });
@@ -1308,7 +1308,7 @@
                 
                 // Simple connection test
                 const { data, error } = await supabase
-                    .from('users')
+                    .from('app_users')
                     .select('count(*)', { count: 'exact' })
                     .limit(0);
                 
@@ -1365,7 +1365,7 @@ async function refreshAllData() {
 async function viewUserDetails(userId) {
     try {
         const { data: user, error } = await supabase
-            .from('users')
+            .from('app_users')
             .select(`
                 *,
                 user_packages!user_packages_user_id_fkey (
