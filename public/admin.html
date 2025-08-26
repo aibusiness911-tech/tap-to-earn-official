@@ -227,22 +227,6 @@
             100% { transform: rotate(360deg); }
         }
 
-        .broadcast-section {
-            margin-top: 20px;
-        }
-
-        .broadcast-textarea {
-            width: 100%;
-            min-height: 100px;
-            padding: 15px;
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            border-radius: 8px;
-            background: rgba(255, 255, 255, 0.1);
-            color: white;
-            resize: vertical;
-            font-family: inherit;
-        }
-
         .error-message {
             background: rgba(255, 71, 87, 0.2);
             border: 1px solid #ff4757;
@@ -444,15 +428,12 @@
     </div>
 
     <script>
-        // 🔥 YOUR SUPABASE CREDENTIALS (CONFIGURED)
+        // 🔥 CONFIGURATION - REPLACE WITH YOUR CREDENTIALS
         const SUPABASE_URL = 'https://arjkzpbhinpqensoqqod.supabase.co';
-        // Using service role key for admin operations to avoid Headers cloning issues
         const SUPABASE_SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFyamt6cGJoaW5wcWVuc29xcW9kIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NTA2MDAxNSwiZXhwIjoyMDcwNjM2MDE1fQ.dwT80IaEOwk8Gz6qwHD1eZeu6trTCW8krqD0YaAssQU';
+        const ADMIN_TELEGRAM_ID = 6733587823; // Your Telegram ID
         
-        // Your Telegram ID (ALREADY SET)
-        const ADMIN_TELEGRAM_ID = 6733587823;
-        
-        // Initialize Supabase client
+        // Initialize Supabase client with proper service role configuration
         let supabase;
         let isSupabaseConnected = false;
         
@@ -474,11 +455,11 @@
 
         function initializeSupabase() {
             try {
-                if (SUPABASE_URL === 'YOUR_SUPABASE_URL_HERE' || SUPABASE_SERVICE_KEY === 'YOUR_SUPABASE_ANON_KEY_HERE') {
+                if (SUPABASE_URL === 'YOUR_SUPABASE_URL_HERE' || SUPABASE_SERVICE_KEY === 'YOUR_SUPABASE_SERVICE_KEY_HERE') {
                     throw new Error('Supabase credentials not configured');
                 }
                 
-                // Using service role key for admin operations with custom options
+                // FIXED: Proper service role configuration
                 supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
                     auth: {
                         autoRefreshToken: false,
@@ -486,12 +467,18 @@
                     },
                     global: {
                         headers: {
-                            'X-Client-Info': 'admin-panel'
+                            'apikey': SUPABASE_SERVICE_KEY,
+                            'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`
                         }
+                    },
+                    db: {
+                        schema: 'public'
                     }
                 });
+                
                 isSupabaseConnected = true;
                 console.log('✅ Supabase connected successfully with service role');
+                
             } catch (error) {
                 console.error('❌ Supabase connection failed:', error);
                 showDatabaseError(error.message);
@@ -517,12 +504,8 @@
                 // Get user data from Telegram
                 const telegramUser = tg?.initDataUnsafe?.user;
                 
-                // 🔧 TEMPORARY: Enable testing mode (CHANGE THIS BEFORE PRODUCTION!)
-                // For testing purposes - remove this line in production
-                const isAdmin = true; // Set to false and uncomment line below for production
-                
-                // For production, uncomment this line and comment the line above:
-                // const isAdmin = telegramUser && telegramUser.id === ADMIN_TELEGRAM_ID;
+                // 🔧 For testing - set to false in production
+                const isAdmin = true; // Change to: telegramUser && telegramUser.id === ADMIN_TELEGRAM_ID
 
                 console.log('Admin check:', {
                     telegramUser,
@@ -553,7 +536,8 @@
 
         async function loadAdminData() {
             try {
-                // Load data with better error handling
+                showMessage('Loading admin data...', 'info');
+                
                 const promises = [
                     loadStats().catch(err => console.warn('Stats loading failed:', err)),
                     loadPackageConfig().catch(err => console.warn('Package config loading failed:', err)),
@@ -562,7 +546,7 @@
                 ];
                 
                 await Promise.allSettled(promises);
-                console.log('✅ Admin data loading completed');
+                showMessage('✅ Admin data loaded successfully!', 'success');
                 
             } catch (error) {
                 console.error('Error loading admin data:', error);
@@ -572,51 +556,43 @@
 
         async function loadStats() {
             try {
-                // Get total users
-                const { data: users, error: usersError } = await supabase
-                    .from('users')
-                    .select('*');
-                
-                if (usersError) throw usersError;
+                // FIXED: Better error handling and queries
+                const [usersResult, packagesResult, withdrawalsResult] = await Promise.allSettled([
+                    supabase.from('users').select('*'),
+                    supabase.from('user_packages').select(`*, packages(price)`),
+                    supabase.from('withdrawals').select('*')
+                ]);
 
-                // Get total revenue from packages
-                const { data: packages, error: packagesError } = await supabase
-                    .from('user_packages')
-                    .select(`
-                        *,
-                        packages (price)
-                    `);
+                // Get users data
+                const users = usersResult.status === 'fulfilled' ? usersResult.value.data || [] : [];
                 
-                if (packagesError) throw packagesError;
-
-                // Get withdrawals
-                const { data: withdrawals, error: withdrawalsError } = await supabase
-                    .from('withdrawals')
-                    .select('*');
+                // Get packages data
+                const packages = packagesResult.status === 'fulfilled' ? packagesResult.value.data || [] : [];
                 
-                if (withdrawalsError) throw withdrawalsError;
+                // Get withdrawals data
+                const withdrawals = withdrawalsResult.status === 'fulfilled' ? withdrawalsResult.value.data || [] : [];
 
                 // Update stats
-                document.getElementById('totalUsers').textContent = users?.length || 0;
+                document.getElementById('totalUsers').textContent = users.length;
                 
-                const totalRevenue = packages?.reduce((sum, pkg) => sum + (pkg.packages?.price || 0), 0) || 0;
+                const totalRevenue = packages.reduce((sum, pkg) => sum + (pkg.packages?.price || 0), 0);
                 document.getElementById('totalRevenue').textContent = '$' + totalRevenue.toFixed(2);
                 
-                const totalTaps = users?.reduce((sum, user) => sum + (user.total_taps || 0), 0) || 0;
+                const totalTaps = users.reduce((sum, user) => sum + (user.total_taps || 0), 0);
                 document.getElementById('totalTaps').textContent = totalTaps.toLocaleString();
                 
-                const activePackages = packages?.filter(pkg => pkg.is_active).length || 0;
+                const activePackages = packages.filter(pkg => pkg.is_active).length;
                 document.getElementById('activePackages').textContent = activePackages;
                 
-                const pendingWithdrawals = withdrawals?.filter(w => w.status === 'pending').length || 0;
+                const pendingWithdrawals = withdrawals.filter(w => w.status === 'pending').length;
                 document.getElementById('pendingWithdrawals').textContent = pendingWithdrawals;
                 
-                const totalReferrals = users?.reduce((sum, user) => sum + (user.referral_count || 0), 0) || 0;
+                const totalReferrals = users.reduce((sum, user) => sum + (user.referral_count || 0), 0);
                 document.getElementById('totalReferrals').textContent = totalReferrals;
 
             } catch (error) {
                 console.error('Error loading stats:', error);
-                showMessage('Failed to load statistics', 'error');
+                showMessage('Failed to load statistics: ' + error.message, 'error');
             }
         }
 
@@ -633,7 +609,7 @@
                 const select = document.getElementById('packageSelect');
                 select.innerHTML = '<option value="">Select Package</option>';
                 
-                packages.forEach(pkg => {
+                (packages || []).forEach(pkg => {
                     const option = document.createElement('option');
                     option.value = pkg.id;
                     option.textContent = `${pkg.name} - $${parseFloat(pkg.price).toFixed(2)}`;
@@ -642,12 +618,13 @@
 
             } catch (error) {
                 console.error('Error loading package select:', error);
+                showMessage('Failed to load packages for selection', 'error');
             }
         }
 
         async function assignPackageToUser() {
             try {
-                const userId = document.getElementById('packageUserIdInput').value;
+                const userId = document.getElementById('packageUserIdInput').value.trim();
                 const packageId = document.getElementById('packageSelect').value;
                 
                 if (!userId || !packageId) {
@@ -657,15 +634,36 @@
 
                 showMessage('Assigning package...', 'info');
 
-                // First check if user exists
-                const { data: user, error: getUserError } = await supabase
+                // FIXED: Check if user exists first, create if not
+                let { data: user, error: getUserError } = await supabase
                     .from('users')
                     .select('telegram_id, username')
                     .eq('telegram_id', userId)
                     .single();
 
-                if (getUserError || !user) {
-                    throw new Error('User not found');
+                if (getUserError) {
+                    if (getUserError.code === 'PGRST116') {
+                        // User doesn't exist, create them
+                        const { error: createUserError } = await supabase
+                            .from('users')
+                            .insert({
+                                telegram_id: parseInt(userId),
+                                username: `user_${userId}`,
+                                balance: 0,
+                                total_taps: 0,
+                                energy: 100,
+                                max_energy: 100,
+                                level: 1,
+                                created_at: new Date().toISOString()
+                            });
+
+                        if (createUserError) throw createUserError;
+                        
+                        user = { telegram_id: parseInt(userId), username: `user_${userId}` };
+                        showMessage('User created automatically', 'success');
+                    } else {
+                        throw getUserError;
+                    }
                 }
 
                 // Get package details
@@ -679,11 +677,11 @@
                     throw new Error('Package not found');
                 }
 
-                // Check if user already has this package
+                // Check if user already has this package active
                 const { data: existingPackage, error: checkError } = await supabase
                     .from('user_packages')
                     .select('*')
-                    .eq('user_id', userId)
+                    .eq('user_id', parseInt(userId))
                     .eq('package_id', packageId)
                     .eq('is_active', true);
 
@@ -697,18 +695,18 @@
                 // Calculate expiry date
                 const purchaseDate = new Date();
                 const expiryDate = new Date(purchaseDate);
-                expiryDate.setDate(expiryDate.getDate() + packageData.duration_days);
+                expiryDate.setDate(expiryDate.getDate() + (packageData.duration_days || 30));
 
-                // Assign package to user
+                // FIXED: Assign package with proper data types
                 const { error: assignError } = await supabase
                     .from('user_packages')
                     .insert({
-                        user_id: userId,
-                        package_id: packageId,
+                        user_id: parseInt(userId),
+                        package_id: parseInt(packageId),
                         purchase_date: purchaseDate.toISOString(),
                         expiry_date: expiryDate.toISOString(),
                         is_active: true,
-                        remaining_profit: packageData.max_profit,
+                        remaining_profit: parseFloat(packageData.max_profit),
                         daily_taps_used: 0,
                         created_at: new Date().toISOString()
                     });
@@ -721,7 +719,7 @@
                     .insert({
                         admin_telegram_id: ADMIN_TELEGRAM_ID,
                         action: 'assign_package',
-                        target_user_id: userId,
+                        target_user_id: parseInt(userId),
                         details: {
                             package_id: packageId,
                             package_name: packageData.name,
@@ -757,6 +755,7 @@
                 if (error) throw error;
 
                 displayUsers(users || []);
+                showMessage('✅ Users loaded successfully!', 'success');
                 
             } catch (error) {
                 console.error('Error loading users:', error);
@@ -778,7 +777,7 @@
                 row.innerHTML = `
                     <td>${user.telegram_id}</td>
                     <td>${user.username || 'N/A'}</td>
-                    <td>${parseFloat(user.balance || 0).toFixed(2)}</td>
+                    <td>$${parseFloat(user.balance || 0).toFixed(2)}</td>
                     <td>${user.total_taps || 0}</td>
                     <td>${user.level || 1}</td>
                     <td>${user.referral_count || 0}</td>
@@ -815,6 +814,7 @@
                 if (error) throw error;
 
                 displayUsers(users || []);
+                showMessage(`Found ${users?.length || 0} users`, 'success');
                 
             } catch (error) {
                 console.error('Error searching users:', error);
@@ -824,7 +824,7 @@
 
         async function addCoins() {
             try {
-                const userId = document.getElementById('userIdInput').value;
+                const userId = document.getElementById('userIdInput').value.trim();
                 const coinsToAdd = parseFloat(document.getElementById('coinsToAdd').value);
                 
                 if (!userId || !coinsToAdd || coinsToAdd <= 0) {
@@ -834,15 +834,41 @@
 
                 showMessage('Adding coins...', 'info');
 
-                // First get current balance
-                const { data: user, error: getUserError } = await supabase
+                // FIXED: Get current balance with better error handling
+                let { data: user, error: getUserError } = await supabase
                     .from('users')
                     .select('balance, username')
                     .eq('telegram_id', userId)
                     .single();
 
-                if (getUserError || !user) {
-                    throw new Error('User not found');
+                if (getUserError) {
+                    if (getUserError.code === 'PGRST116') {
+                        // User doesn't exist, create them first
+                        const { error: createUserError } = await supabase
+                            .from('users')
+                            .insert({
+                                telegram_id: parseInt(userId),
+                                username: `user_${userId}`,
+                                balance: coinsToAdd,
+                                total_taps: 0,
+                                energy: 100,
+                                max_energy: 100,
+                                level: 1,
+                                created_at: new Date().toISOString()
+                            });
+
+                        if (createUserError) throw createUserError;
+                        
+                        showMessage(`✅ User created and ${coinsToAdd} coins added!`, 'success');
+                        
+                        // Clear inputs
+                        document.getElementById('userIdInput').value = '';
+                        document.getElementById('coinsToAdd').value = '';
+                        
+                        return;
+                    } else {
+                        throw getUserError;
+                    }
                 }
 
                 // Update balance
@@ -862,10 +888,11 @@
                 await supabase
                     .from('transactions')
                     .insert({
-                        user_id: userId,
+                        user_id: parseInt(userId),
                         type: 'admin_add',
                         amount: coinsToAdd,
-                        description: `Admin added ${coinsToAdd} coins`
+                        description: `Admin added ${coinsToAdd} coins`,
+                        created_at: new Date().toISOString()
                     });
 
                 // Log admin action
@@ -874,7 +901,7 @@
                     .insert({
                         admin_telegram_id: ADMIN_TELEGRAM_ID,
                         action: 'add_coins',
-                        target_user_id: userId,
+                        target_user_id: parseInt(userId),
                         details: {
                             amount: coinsToAdd,
                             old_balance: user.balance,
@@ -882,14 +909,17 @@
                         }
                     });
 
-                showMessage(`✅ Added ${coinsToAdd} to ${user.username || userId}'s account!`, 'success');
+                showMessage(`✅ Added $${coinsToAdd} to ${user.username || userId}'s account!`, 'success');
                 
                 // Clear inputs
                 document.getElementById('userIdInput').value = '';
                 document.getElementById('coinsToAdd').value = '';
                 
-                // Refresh user list
-                await loadAllUsers();
+                // Refresh user list if visible
+                const tbody = document.getElementById('usersTableBody');
+                if (tbody.children.length > 1) {
+                    await loadAllUsers();
+                }
                 
             } catch (error) {
                 console.error('Error adding coins:', error);
@@ -899,7 +929,7 @@
 
         async function toggleUserBan(userTelegramId = null) {
             try {
-                const userId = userTelegramId || document.getElementById('userIdInput').value;
+                const userId = userTelegramId || document.getElementById('userIdInput').value.trim();
                 
                 if (!userId) {
                     showMessage('Please enter User ID!', 'error');
@@ -915,7 +945,7 @@
                     .eq('telegram_id', userId)
                     .single();
 
-                if (getUserError || !user) {
+                if (getUserError) {
                     throw new Error('User not found');
                 }
 
@@ -938,7 +968,7 @@
                     .insert({
                         admin_telegram_id: ADMIN_TELEGRAM_ID,
                         action: newStatus ? 'ban_user' : 'unban_user',
-                        target_user_id: userId,
+                        target_user_id: parseInt(userId),
                         details: {
                             previous_status: user.is_banned,
                             new_status: newStatus
@@ -952,8 +982,11 @@
                     document.getElementById('userIdInput').value = '';
                 }
                 
-                // Refresh user list
-                await loadAllUsers();
+                // Refresh user list if visible
+                const tbody = document.getElementById('usersTableBody');
+                if (tbody.children.length > 1) {
+                    await loadAllUsers();
+                }
                 
             } catch (error) {
                 console.error('Error toggling user ban:', error);
@@ -977,6 +1010,7 @@
                 if (error) throw error;
 
                 displayWithdrawals(withdrawals || []);
+                showMessage('✅ Withdrawals loaded successfully!', 'success');
                 
             } catch (error) {
                 console.error('Error loading withdrawals:', error);
@@ -1000,7 +1034,7 @@
                     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
                         <div>
                             <strong>${withdrawal.users?.username || 'Unknown'}</strong> (ID: ${withdrawal.user_id})<br>
-                            Amount: <strong>${parseFloat(withdrawal.amount).toFixed(2)}</strong><br>
+                            Amount: <strong>$${parseFloat(withdrawal.amount).toFixed(2)}</strong><br>
                             Wallet: <code style="word-break: break-all;">${withdrawal.wallet_address}</code><br>
                             <small>Requested: ${new Date(withdrawal.request_date).toLocaleString()}</small>
                         </div>
@@ -1032,6 +1066,7 @@
 
                 showMessage('✅ Withdrawal approved successfully!', 'success');
                 await loadPendingWithdrawals();
+                await loadStats();
                 
             } catch (error) {
                 console.error('Error approving withdrawal:', error);
@@ -1041,7 +1076,7 @@
 
         async function rejectWithdrawal(withdrawalId) {
             try {
-                const reason = prompt('Reason for rejection (optional):');
+                const reason = prompt('Reason for rejection (optional):') || 'No reason provided';
                 
                 if (!confirm('Are you sure you want to reject this withdrawal?')) return;
 
@@ -1060,6 +1095,7 @@
 
                 showMessage('❌ Withdrawal rejected successfully!', 'success');
                 await loadPendingWithdrawals();
+                await loadStats();
                 
             } catch (error) {
                 console.error('Error rejecting withdrawal:', error);
@@ -1085,6 +1121,7 @@
 
                 showMessage('✅ All withdrawals approved!', 'success');
                 await loadPendingWithdrawals();
+                await loadStats();
                 
             } catch (error) {
                 console.error('Error approving all withdrawals:', error);
@@ -1123,9 +1160,9 @@
                 card.className = 'package-card';
                 card.innerHTML = `
                     <h4>${pkg.name}</h4>
-                    <p><strong>Price:</strong> ${parseFloat(pkg.price).toFixed(2)}</p>
-                    <p><strong>Max Profit:</strong> ${parseFloat(pkg.max_profit).toFixed(2)}</p>
-                    <p><strong>Duration:</strong> ${pkg.duration_days} days</p>
+                    <p><strong>Price:</strong> $${parseFloat(pkg.price).toFixed(2)}</p>
+                    <p><strong>Max Profit:</strong> $${parseFloat(pkg.max_profit).toFixed(2)}</p>
+                    <p><strong>Duration:</strong> ${pkg.duration_days || 30} days</p>
                     <p><strong>Daily Tap Limit:</strong> ${pkg.daily_tap_limit}</p>
                     <p><strong>Status:</strong> <span style="color: ${pkg.is_active ? '#2ed573' : '#ff4757'}">${pkg.is_active ? 'Active' : 'Inactive'}</span></p>
                     <div style="margin-top: 15px;">
@@ -1151,6 +1188,11 @@
                     return;
                 }
 
+                if (price <= 0 || profit <= 0 || tapLimit <= 0) {
+                    showMessage('All values must be positive!', 'error');
+                    return;
+                }
+
                 showMessage('Creating package...', 'info');
 
                 const { error } = await supabase
@@ -1161,7 +1203,8 @@
                         max_profit: profit,
                         daily_tap_limit: tapLimit,
                         duration_days: 30,
-                        is_active: true
+                        is_active: true,
+                        created_at: new Date().toISOString()
                     });
 
                 if (error) throw error;
@@ -1175,6 +1218,7 @@
                 document.getElementById('newPackageTapLimit').value = '';
                 
                 await loadPackageConfig();
+                await loadPackageSelect();
                 
             } catch (error) {
                 console.error('Error creating package:', error);
@@ -1207,6 +1251,7 @@
 
                 showMessage(`✅ Package "${pkg.name}" ${newStatus ? 'enabled' : 'disabled'}!`, 'success');
                 await loadPackageConfig();
+                await loadPackageSelect();
                 
             } catch (error) {
                 console.error('Error toggling package:', error);
@@ -1226,23 +1271,23 @@
                 if (getError || !pkg) throw new Error('Package not found');
 
                 const newName = prompt(`Enter new name for ${pkg.name}:`, pkg.name);
-                if (!newName) return;
+                if (!newName || newName.trim() === '') return;
 
                 const newPrice = prompt(`Enter new price for ${pkg.name}:`, pkg.price);
-                if (!newPrice) return;
+                if (!newPrice || parseFloat(newPrice) <= 0) return;
 
                 const newProfit = prompt(`Enter new max profit for ${pkg.name}:`, pkg.max_profit);
-                if (!newProfit) return;
+                if (!newProfit || parseFloat(newProfit) <= 0) return;
 
                 const newTapLimit = prompt(`Enter new daily tap limit for ${pkg.name}:`, pkg.daily_tap_limit);
-                if (!newTapLimit) return;
+                if (!newTapLimit || parseInt(newTapLimit) <= 0) return;
 
                 showMessage('Updating package...', 'info');
 
                 const { error } = await supabase
                     .from('packages')
                     .update({ 
-                        name: newName,
+                        name: newName.trim(),
                         price: parseFloat(newPrice),
                         max_profit: parseFloat(newProfit),
                         daily_tap_limit: parseInt(newTapLimit),
@@ -1254,6 +1299,7 @@
 
                 showMessage(`✅ Package updated successfully!`, 'success');
                 await loadPackageConfig();
+                await loadPackageSelect();
                 
             } catch (error) {
                 console.error('Error editing package:', error);
@@ -1261,143 +1307,154 @@
             }
         }
 
-        // 🔧 FIXED: Corrected testConnection function - this was causing the loading issue
+        // FIXED: Better connection test
         async function testConnection() {
             try {
-                // Simple connection test - just select first user
+                showMessage('Testing connection...', 'info');
+                
+                // Simple connection test
                 const { data, error } = await supabase
                     .from('users')
-                    .select('telegram_id')
-                    .limit(1);
+                    .select('count(*)', { count: 'exact' })
+                    .limit(0);
                 
                 if (error) {
-                    // If users table doesn't exist, try a different approach
-                    if (error.code === 'PGRST116') {
-                        // Table doesn't exist, but connection works
-                        document.getElementById('databaseStatus').innerHTML = `
-                            <p style="color: #ffa726;">⚠️ Database connected but tables may not exist!</p>
-                            <p><small>Connection test completed at ${new Date().toLocaleString()}</small></p>
-                            <p><small>Please set up your database tables first.</small></p>
-                        `;
-                        return;
-                    }
-                    throw error;
-                }
-                
+                    if (error.code === 'PGRST116')
+
+            // Table doesn't exist, create a basic structure
                 document.getElementById('databaseStatus').innerHTML = `
-                    <p style="color: #2ed573;">✅ Database connected successfully!</p>
+                    <p style="color: #ffa726;">⚠️ Database connected but tables may not exist!</p>
                     <p><small>Connection test completed at ${new Date().toLocaleString()}</small></p>
-                    <p><small>Found ${data ? data.length : 0} records in users table.</small></p>
+                    <p><small>Please run the database setup SQL script first.</small></p>
                 `;
-                
-            } catch (error) {
-                console.error('Connection test failed:', error);
-                document.getElementById('databaseStatus').innerHTML = `
-                    <p style="color: #ff4757;">❌ Database connection failed!</p>
-                    <p><small>Error: ${error.message}</small></p>
-                    <p><small>Code: ${error.code || 'Unknown'}</small></p>
-                `;
-                
-                // Show database error screen if connection completely fails
-                if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-                    showDatabaseError('Network connection failed. Please check your internet connection.');
-                }
+                return;
             }
+            throw error;
         }
-
-        async function refreshAllData() {
-            showMessage('Refreshing all data...', 'info');
-            await loadAdminData();
-            showMessage('✅ All data refreshed!', 'success');
+        
+        document.getElementById('databaseStatus').innerHTML = `
+            <p style="color: #2ed573;">✅ Database connected successfully!</p>
+            <p><small>Connection test completed at ${new Date().toLocaleString()}</small></p>
+            <p><small>Found ${data?.[0]?.count || 0} users in database.</small></p>
+        `;
+        
+        showMessage('✅ Database connection successful!', 'success');
+        
+    } catch (error) {
+        console.error('Connection test failed:', error);
+        document.getElementById('databaseStatus').innerHTML = `
+            <p style="color: #ff4757;">❌ Database connection failed!</p>
+            <p><small>Error: ${error.message}</small></p>
+            <p><small>Code: ${error.code || 'Unknown'}</small></p>
+        `;
+        
+        showMessage('Database connection failed: ' + error.message, 'error');
+        
+        // Show database error screen if connection completely fails
+        if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+            showDatabaseError('Network connection failed. Please check your internet connection.');
         }
+    }
+}
 
-        async function viewUserDetails(userId) {
-            try {
-                const { data: user, error } = await supabase
-                    .from('users')
-                    .select(`
-                        *,
-                        user_packages!user_packages_user_id_fkey (
-                            *,
-                            packages (name, price)
-                        )
-                    `)
-                    .eq('telegram_id', userId)
-                    .single();
-                
-                if (error || !user) throw new Error('User not found');
+async function refreshAllData() {
+    try {
+        showMessage('Refreshing all data...', 'info');
+        await loadAdminData();
+        showMessage('✅ All data refreshed successfully!', 'success');
+    } catch (error) {
+        console.error('Error refreshing data:', error);
+        showMessage('Failed to refresh data: ' + error.message, 'error');
+    }
+}
 
-                const activePackages = user.user_packages?.filter(up => up.is_active) || [];
-                const totalInvested = user.user_packages?.reduce((sum, up) => sum + (up.packages?.price || 0), 0) || 0;
+async function viewUserDetails(userId) {
+    try {
+        const { data: user, error } = await supabase
+            .from('users')
+            .select(`
+                *,
+                user_packages!user_packages_user_id_fkey (
+                    *,
+                    packages (name, price)
+                )
+            `)
+            .eq('telegram_id', userId)
+            .single();
+        
+        if (error || !user) throw new Error('User not found');
 
-                const details = `
+        const activePackages = user.user_packages?.filter(up => up.is_active) || [];
+        const totalInvested = user.user_packages?.reduce((sum, up) => sum + (up.packages?.price || 0), 0) || 0;
+
+        const details = `
 👤 User Details:
-━━━━━━━━━━━━━━━━━
+═══════════════════════════
 Telegram ID: ${user.telegram_id}
 Username: ${user.username || 'N/A'}
 Name: ${user.first_name || ''} ${user.last_name || ''}
-Balance: ${parseFloat(user.balance || 0).toFixed(2)}
+Balance: $${parseFloat(user.balance || 0).toFixed(2)}
 Total Taps: ${user.total_taps || 0}
 Energy: ${user.energy || 0}/${user.max_energy || 0}
 Level: ${user.level || 1}
-Total Invested: ${totalInvested.toFixed(2)}
+Total Invested: $${totalInvested.toFixed(2)}
 Active Packages: ${activePackages.length}
 Referrals: ${user.referral_count || 0}
 Wallet: ${user.wallet_address || 'Not set'}
 Status: ${user.is_banned ? 'BANNED' : 'ACTIVE'}
 Joined: ${new Date(user.created_at).toLocaleString()}
 Last Active: ${new Date(user.last_active || user.created_at).toLocaleString()}
-━━━━━━━━━━━━━━━━━
-                `.trim();
-                
-                alert(details);
-                
-            } catch (error) {
-                console.error('Error getting user details:', error);
-                showMessage('Failed to load user details: ' + error.message, 'error');
-            }
-        }
+═══════════════════════════
+        `.trim();
+        
+        alert(details);
+        
+    } catch (error) {
+        console.error('Error getting user details:', error);
+        showMessage('Failed to load user details: ' + error.message, 'error');
+    }
+}
 
-        // Helper function to show messages
-        function showMessage(message, type = 'success') {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = type === 'success' ? 'success-message' : (type === 'error' ? 'error-message' : 'success-message');
-            messageDiv.textContent = message;
-            messageDiv.style.cssText = `
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                padding: 15px 20px;
-                border-radius: 8px;
-                font-weight: bold;
-                z-index: 9999;
-                animation: slideIn 0.3s ease-out;
-                max-width: 300px;
-            `;
-            
-            // Override color for info messages
-            if (type === 'info') {
-                messageDiv.style.background = 'rgba(0, 212, 255, 0.2)';
-                messageDiv.style.border = '1px solid #00d4ff';
-                messageDiv.style.color = '#00d4ff';
-            }
-            
-            document.body.appendChild(messageDiv);
-            
-            setTimeout(() => {
-                messageDiv.remove();
-            }, 3000);
-        }
+// Helper function to show messages
+function showMessage(message, type = 'success') {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = type === 'success' ? 'success-message' : (type === 'error' ? 'error-message' : 'success-message');
+    messageDiv.textContent = message;
+    messageDiv.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 15px 20px;
+        border-radius: 8px;
+        font-weight: bold;
+        z-index: 9999;
+        animation: slideIn 0.3s ease-out;
+        max-width: 300px;
+    `;
+    
+    // Override color for info messages
+    if (type === 'info') {
+        messageDiv.style.background = 'rgba(0, 212, 255, 0.2)';
+        messageDiv.style.border = '1px solid #00d4ff';
+        messageDiv.style.color = '#00d4ff';
+    }
+    
+    document.body.appendChild(messageDiv);
+    
+    setTimeout(() => {
+        messageDiv.remove();
+    }, 3000);
+}
 
-        // Add CSS animation for messages
-        const style = document.createElement('style');
-        style.textContent = `
-            @keyframes slideIn {
-                from { transform: translateX(100%); opacity: 0; }
-                to { transform: translateX(0); opacity: 1; }
-            }
-        `;
-        document.head.appendChild(style);
+// Add CSS animation for messages
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes slideIn {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+`;
+document.head.appendChild(style);
     </script>
 </body>
 </html>
