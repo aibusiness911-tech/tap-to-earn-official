@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>Admin Panel - Tap to Earn</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.7/dist/umd/supabase.js"></script>
@@ -622,6 +622,7 @@
             }
         }
 
+        /* ==================== FIXED assignPackageToUser ==================== */
         async function assignPackageToUser() {
             try {
                 const userId = document.getElementById('packageUserIdInput').value.trim();
@@ -634,7 +635,7 @@
 
                 showMessage('Assigning package...', 'info');
 
-                // FIXED: Check if user exists first, create if not
+                // Check if user exists
                 let { data: user, error: getUserError } = await supabase
                     .from('app_users')
                     .select('telegram_id, username')
@@ -642,8 +643,10 @@
                     .single();
 
                 if (getUserError) {
-                    if (getUserError.code === 'PGRST116') {
-                        // User doesn't exist, create them
+                    // PostgREST returns code 'PGRST116' for no rows when using .single()
+                    // But sometimes error shape differs, so check message too
+                    if (getUserError.code === 'PGRST116' || /No rows/.test(getUserError.message || '')) {
+                        // User doesn’t exist → create
                         const { error: createUserError } = await supabase
                             .from('app_users')
                             .insert({
@@ -677,7 +680,7 @@
                     throw new Error('Package not found');
                 }
 
-                // Check if user already has this package active
+                // Check if user already has this package
                 const { data: existingPackage, error: checkError } = await supabase
                     .from('user_packages')
                     .select('*')
@@ -697,7 +700,7 @@
                 const expiryDate = new Date(purchaseDate);
                 expiryDate.setDate(expiryDate.getDate() + (packageData.duration_days || 30));
 
-                // FIXED: Assign package with proper data types
+                // ✅ FIXED: removed `remaining_profit` (since DB doesn’t have it)
                 const { error: assignError } = await supabase
                     .from('user_packages')
                     .insert({
@@ -705,8 +708,7 @@
                         package_id: parseInt(packageId),
                         purchase_date: purchaseDate.toISOString(),
                         expiry_date: expiryDate.toISOString(),
-                        is_active: true,
-                        remaining_profit: parseFloat(packageData.max_profit),
+                        is_active: true
                     });
 
                 if (assignError) throw assignError;
@@ -728,18 +730,18 @@
 
                 showMessage(`✅ Package "${packageData.name}" assigned to ${user.username || userId}!`, 'success');
                 
-                // Clear inputs
+                // Reset inputs
                 document.getElementById('packageUserIdInput').value = '';
                 document.getElementById('packageSelect').value = '';
                 
-                // Refresh stats
                 await loadStats();
                 
             } catch (error) {
                 console.error('Error assigning package:', error);
-                showMessage('Failed to assign package: ' + error.message, 'error');
+                showMessage('Failed to assign package: ' + (error.message || error), 'error');
             }
         }
+        /* ================================================================ */
 
         async function loadAllUsers() {
             try {
@@ -881,29 +883,6 @@
 
                 if (updateError) throw updateError;
 
-                // Log the transaction
-               // .from('transactions')
-                // .insert({
-                 //     user_id: parseInt(userId),
-               //     type: 'admin_add',
-               //     amount: coinsToAdd,
-               //     description: `Admin added ${coinsToAdd} coins`,
-               //     created_at: new Date().toISOString()
-               // });
-                // Log admin action
-// await supabase
-//     .from('admin_logs')
-//     .insert({
-//         admin_telegram_id: ADMIN_TELEGRAM_ID,
-//         action: 'add_coins',
-//         target_user_id: parseInt(userId),
-//         details: {
-//             amount: coinsToAdd,
-//             old_balance: user.balance,
-//             new_balance: newBalance
-//         }
-//     });
-                
                 // Clear inputs
                 document.getElementById('userIdInput').value = '';
                 document.getElementById('coinsToAdd').value = '';
