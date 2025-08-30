@@ -3,7 +3,7 @@ const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
 
 // Initialize bot
-const bot = new TelegramBot(process.env.BOT_TOKEN, { polling: true });
+const bot = new TelegramBot(process.env.BOT_TOKEN, { polling: false });
 
 // Initialize Supabase
 const supabase = createClient(
@@ -12,7 +12,8 @@ const supabase = createClient(
 );
 
 // Mini App URL
-const MINI_APP_URL = process.env.MINI_APP_URL || 'https://tap-to-earn-bot-production.up.railway.app';
+// Mini App URL
+const MINI_APP_URL = process.env.MINI_APP_URL || 'https://tap-to-earn-bot.onrender.com';
 const ADMIN_ID = parseInt(process.env.ADMIN_TELEGRAM_ID);
 
 // Create or get user in database
