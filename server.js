@@ -40,9 +40,37 @@ const pendingWithdrawals = new Map();
 // Helper function to get current TON price
 async function getTonPrice() {
     try {
-        const response = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=the-open-network&vs_currencies=usd&x_cg_demo_api_key=${COINGECKO_API_KEY}`);
-        const data = await response.json();
-        return data['the-open-network']?.usd || 3.31;
+        // Try multiple API sources for TON price
+        const apis = [
+            `https://api.coingecko.com/api/v3/simple/price?ids=the-open-network&vs_currencies=usd`,
+            `https://api.coinbase.com/v2/exchange-rates?currency=TON`,
+            `https://api.binance.com/api/v3/ticker/price?symbol=TONUSDT`
+        ];
+        
+        for (const apiUrl of apis) {
+            try {
+                const response = await fetch(apiUrl, {
+                    headers: {
+                        'User-Agent': 'TapToEarnBot/1.0'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    if (apiUrl.includes('coingecko')) {
+                        return data['the-open-network']?.usd || 3.31;
+                    } else if (apiUrl.includes('binance')) {
+                        return parseFloat(data.price) || 3.31;
+                    }
+                }
+            } catch (apiError) {
+                console.log(`API ${apiUrl} failed:`, apiError.message);
+                continue;
+            }
+        }
+        
+        return 3.31; // Fallback price
     } catch (error) {
         console.error('Error fetching TON price:', error);
         return 3.31; // Fallback price
