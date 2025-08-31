@@ -668,7 +668,205 @@ Tap below to share your link:
     }
 });
 
-// /admin command (admin only)
+// /support command
+bot.onText(/\/support/, async (msg) => {
+    const chatId = msg.chat.id;
+    
+    const supportMessage = `
+🛠️ *Support & Help*
+
+Need assistance? Here's how to get help:
+
+📧 Contact Support:
+• Email: support@taptoearn.bot
+• Telegram: @TapToEarnSupport
+
+🔧 Common Issues:
+• Bot not responding → Restart with /start
+• Balance not updating → Wait a few seconds and check again
+• Withdrawal issues → Contact admin
+• Package problems → Use /packages command
+
+💡 Quick Fixes:
+• Clear browser cache
+• Restart the mini app
+• Check your internet connection
+
+⚡ Response time: Usually within 24 hours
+    `;
+    
+    await bot.sendMessage(chatId, supportMessage, { parse_mode: 'Markdown' });
+});
+
+// /withdraw command  
+bot.onText(/\/withdraw/, async (msg) => {
+    const chatId = msg.chat.id;
+    const userId = msg.from.id.toString();
+    
+    try {
+        const user = getUser(userId);
+        const tonPrice = await getTonPrice();
+        const dollarValue = user.points / 1000;
+        const tonValue = dollarValue / tonPrice;
+        
+        // Check cooldown
+        const now = Date.now();
+        const cooldownEnd = user.withdrawalCooldown + (59 * 24 * 60 * 60 * 1000); // 59 days
+        const isOnCooldown = now < cooldownEnd;
+        const daysLeft = isOnCooldown ? Math.ceil((cooldownEnd - now) / (24 * 60 * 60 * 1000)) : 0;
+        
+        const withdrawMessage = `
+💸 *Withdrawal Information*
+
+💰 Your Current Balance:
+• Points: ${user.points.toLocaleString()}
+• USD Value: ${dollarValue.toFixed(4)}
+• TON Value: ${tonValue.toFixed(6)} TON
+
+📋 *Withdrawal Rules:*
+• Minimum: 0.01 TON
+• Fee: 1 TON (one-time)
+• Cooldown: 59 days between withdrawals
+• Status: ${isOnCooldown ? `🔒 ${daysLeft} days remaining` : '✅ Available'}
+
+💎 Current TON Price: ${tonPrice}
+
+${isOnCooldown ? 
+    '⏳ Your next withdrawal will be available in ' + daysLeft + ' days.' : 
+    '✅ You can withdraw now! Use the Mini App to process withdrawal.'
+}
+
+To withdraw, use the 🎮 Mini App button from /start
+        `;
+        
+        const keyboard = {
+            reply_markup: {
+                inline_keyboard: [
+                    [{ text: '🎮 Open Mini App', web_app: { url: 'https://tap-to-earn-bot.onrender.com' } }],
+                    [{ text: '💰 Check Balance', callback_data: 'balance' }]
+                ]
+            }
+        };
+        
+        await bot.sendMessage(chatId, withdrawMessage, { 
+            parse_mode: 'Markdown',
+            ...keyboard
+        });
+        
+    } catch (error) {
+        console.error('Error in /withdraw command:', error);
+        await bot.sendMessage(chatId, 'Error fetching withdrawal info. Please try again.');
+    }
+});
+
+// /packages command
+bot.onText(/\/packages/, async (msg) => {
+    const chatId = msg.chat.id;
+    const userId = msg.from.id.toString();
+    
+    try {
+        const user = getUser(userId);
+        const tonPrice = await getTonPrice();
+        
+        const packagesMessage = `
+📦 *Available Packages*
+
+💰 Current Package: ${user.activePackage || 'None'}
+⚡ Current Tap Value: ${user.tapValue} points
+
+🎯 *Package Options:*
+
+💎 **$5 Package**
+• Tap Value: 0.2 points
+• Max Earnings: 10,000 points
+• Price: ${(5/tonPrice).toFixed(3)} TON
+
+💎 **$10 Package**
+• Tap Value: 0.25 points  
+• Max Earnings: 20,000 points
+• Price: ${(10/tonPrice).toFixed(3)} TON
+
+💎 **$50 Package**
+• Tap Value: 0.5 points
+• Max Earnings: 100,000 points
+• Price: ${(50/tonPrice).toFixed(3)} TON
+
+💎 **$100 Package**
+• Tap Value: 1.0 points
+• Max Earnings: 200,000 points
+• Price: ${(100/tonPrice).toFixed(3)} TON
+
+🚀 **$500 Unlimited**
+• Tap Value: 1.0 points
+• Unlimited Taps Daily!
+• Price: ${(500/tonPrice).toFixed(3)} TON
+
+🌟 **$1000 Premium**
+• Tap Value: 10.0 points
+• Max Earnings: 2,000,000 points
+• Price: ${(1000/tonPrice).toFixed(3)} TON
+
+💎 TON Price: ${tonPrice}
+
+To buy packages, use the 🎮 Mini App!
+        `;
+        
+        const keyboard = {
+            reply_markup: {
+                inline_keyboard: [
+                    [{ text: '🎮 Buy Packages', web_app: { url: 'https://tap-to-earn-bot.onrender.com' } }],
+                    [{ text: '💰 Check Balance', callback_data: 'balance' }]
+                ]
+            }
+        };
+        
+        await bot.sendMessage(chatId, packagesMessage, { 
+            parse_mode: 'Markdown',
+            ...keyboard
+        });
+        
+    } catch (error) {
+        console.error('Error in /packages command:', error);
+        await bot.sendMessage(chatId, 'Error fetching package info. Please try again.');
+    }
+});
+
+// /stats command (public stats)
+bot.onText(/\/stats/, async (msg) => {
+    const chatId = msg.chat.id;
+    
+    try {
+        const stats = {
+            totalUsers: users.size,
+            totalPoints: Array.from(users.values()).reduce((sum, user) => sum + user.points, 0),
+            activePackages: Array.from(users.values()).filter(user => user.activePackage).length,
+            totalReferrals: Array.from(users.values()).reduce((sum, user) => sum + user.totalReferrals, 0)
+        };
+        
+        const tonPrice = await getTonPrice();
+        
+        const statsMessage = `
+📊 *Bot Statistics*
+
+👥 Total Users: ${stats.totalUsers.toLocaleString()}
+💰 Total Points: ${stats.totalPoints.toLocaleString()}
+📦 Active Packages: ${stats.activePackages}
+👥 Total Referrals: ${stats.totalReferrals}
+
+💎 Current TON Price: ${tonPrice}
+🤖 Bot Status: ✅ Online
+⚡ Uptime: ${Math.floor(process.uptime() / 3600)}h ${Math.floor((process.uptime() % 3600) / 60)}m
+
+Join the earning revolution! 🚀
+        `;
+        
+        await bot.sendMessage(chatId, statsMessage, { parse_mode: 'Markdown' });
+        
+    } catch (error) {
+        console.error('Error in /stats command:', error);
+        await bot.sendMessage(chatId, 'Error fetching stats. Please try again.');
+    }
+});
 bot.onText(/\/admin/, async (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id.toString();
@@ -734,28 +932,104 @@ bot.on('callback_query', async (callbackQuery) => {
         
         switch(data) {
             case 'balance':
-                // Trigger balance command
-                await bot.sendMessage(chatId, '/balance');
-                const balanceMsg = { chat: { id: chatId }, from: { id: parseInt(userId) } };
-                await bot.onText(/\/balance/).find(handler => handler.regexp.test('/balance')).callback(balanceMsg);
+                // Execute balance command directly
+                const user = getUser(userId);
+                checkDailyReset(user);
+                
+                const tonPrice = await getTonPrice();
+                const dollarValue = user.points / 1000;
+                const tonValue = dollarValue / tonPrice;
+                
+                const balanceMessage = `
+💰 *Your Balance:*
+
+🪙 Points: ${user.points.toLocaleString()}
+💵 USD Value: ${dollarValue.toFixed(4)}
+💎 TON Value: ${tonValue.toFixed(6)} TON
+
+📊 *Account Stats:*
+⚡ Taps Remaining: ${user.unlimitedTaps ? '∞' : user.tapsRemaining}
+📦 Active Package: ${user.activePackage || 'None'}
+💰 Tap Value: ${user.tapValue} points
+👥 Total Referrals: ${user.totalReferrals}
+
+📈 Current TON Price: ${tonPrice}
+                `;
+                
+                await bot.sendMessage(chatId, balanceMessage, { parse_mode: 'Markdown' });
                 break;
                 
             case 'referrals':
-                // Trigger referrals command
-                const referralMsg = { chat: { id: chatId }, from: { id: parseInt(userId) } };
-                await bot.onText(/\/referrals/).find(handler => handler.regexp.test('/referrals')).callback(referralMsg);
+                // Execute referrals command directly
+                const userRef = getUser(userId);
+                
+                const referralMessage = `
+👥 *Your Referral Stats:*
+
+📊 Total Referrals: ${userRef.totalReferrals}
+💰 Referral Earnings: ${userRef.referralEarnings} points
+🔗 Your Referral Link:
+\`https://t.me/Taptoearnofficial_bot?start=${userId}\`
+
+💡 *How it works:*
+• Share your link with friends
+• Earn 100 points for each new user
+• No limit on referrals!
+                `;
+                
+                await bot.sendMessage(chatId, referralMessage, { parse_mode: 'Markdown' });
                 break;
                 
             case 'help':
-                // Trigger help command
-                const helpMsg = { chat: { id: chatId }, from: { id: parseInt(userId) } };
-                await bot.onText(/\/help/).find(handler => handler.regexp.test('/help')).callback(helpMsg);
+                // Execute help command directly
+                const helpMessage = `
+📚 *Available Commands:*
+
+/start - Start the bot and open mini app
+/help - Show this help message
+/balance - Check your current balance
+/referrals - View your referral stats
+/admin - Admin panel (admin only)
+
+💡 *How to Play:*
+1. Tap the screen to earn points
+2. Buy packages to increase earnings
+3. Invite friends for bonus rewards
+4. Withdraw TON to your wallet
+
+💰 *Earning Rates:*
+- Default: 0.05 points per tap
+- With packages: up to 10 points per tap
+- Daily limit: 100 taps (unlimited with premium)
+                `;
+                
+                await bot.sendMessage(chatId, helpMessage, { parse_mode: 'Markdown' });
                 break;
                 
             case 'admin_stats':
                 if (ADMIN_TELEGRAM_ID && userId === ADMIN_TELEGRAM_ID) {
-                    const adminMsg = { chat: { id: chatId }, from: { id: parseInt(userId) } };
-                    await bot.onText(/\/admin/).find(handler => handler.regexp.test('/admin')).callback(adminMsg);
+                    const stats = {
+                        totalUsers: users.size,
+                        totalTransactions: transactions.size,
+                        pendingWithdrawals: Array.from(pendingWithdrawals.values()).filter(w => w.status === 'pending').length,
+                        totalPoints: Array.from(users.values()).reduce((sum, user) => sum + user.points, 0),
+                        activePackages: Array.from(users.values()).filter(user => user.activePackage).length
+                    };
+                    
+                    const adminMessage = `
+🔧 *Admin Panel:*
+
+📊 *Statistics:*
+👥 Total Users: ${stats.totalUsers}
+💰 Total Points: ${stats.totalPoints.toLocaleString()}
+📦 Active Packages: ${stats.activePackages}
+💸 Pending Withdrawals: ${stats.pendingWithdrawals}
+🔄 Total Transactions: ${stats.totalTransactions}
+
+🌐 Admin Panel: https://tap-to-earn-bot.onrender.com/admin
+                    `;
+                    
+                    await bot.sendMessage(chatId, adminMessage, { parse_mode: 'Markdown' });
                 }
                 break;
                 
@@ -830,61 +1104,275 @@ app.get('/', async (req, res) => {
 // Serve admin panel
 app.get('/admin', async (req, res) => {
     try {
-        // Try to serve the admin panel HTML file
-        const possiblePaths = [
-            path.join(__dirname, 'Fixed Admin Panel - Tap to Earn.html'),
-            path.join(__dirname, 'public', 'admin.html'),
-            path.join(__dirname, 'admin.html')
-        ];
+        // Try to serve the admin panel HTML file from public folder first
+        const adminPath = path.join(__dirname, 'public', 'admin.html');
         
-        for (const filePath of possiblePaths) {
-            try {
-                const html = await fs.readFile(filePath, 'utf8');
-                return res.send(html);
-            } catch (err) {
-                continue; // Try next path
-            }
+        try {
+            const html = await fs.readFile(adminPath, 'utf8');
+            return res.send(html);
+        } catch (err) {
+            // If admin.html not found in public folder, create a working admin panel
+            console.log('Admin panel file not found, serving default admin panel');
         }
         
-        // If no admin file found, return a simple admin page
+        // Get current stats
+        const stats = {
+            totalUsers: users.size,
+            totalTransactions: transactions.size,
+            pendingWithdrawals: Array.from(pendingWithdrawals.values()).filter(w => w.status === 'pending').length,
+            totalPoints: Array.from(users.values()).reduce((sum, user) => sum + user.points, 0),
+            activePackages: Array.from(users.values()).filter(user => user.activePackage).length
+        };
+        
         const adminHtml = `
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Admin Panel - Tap to Earn</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - Tap to Earn Bot</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; background: #f0f0f0; }
-        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; }
-        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }
-        .stat-card { background: #007bff; color: white; padding: 15px; border-radius: 8px; text-align: center; }
-        .stat-value { font-size: 2em; font-weight: bold; }
-        .stat-label { font-size: 0.9em; opacity: 0.9; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { 
+            max-width: 1200px; 
+            margin: 0 auto; 
+            background: white; 
+            border-radius: 15px; 
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #4CAF50 0%, #2196F3 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 { font-size: 2.5em; margin-bottom: 10px; }
+        .header p { font-size: 1.1em; opacity: 0.9; }
+        .stats-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); 
+            gap: 20px; 
+            padding: 30px;
+        }
+        .stat-card { 
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+            color: white; 
+            padding: 25px; 
+            border-radius: 12px; 
+            text-align: center;
+            transform: translateY(0);
+            transition: transform 0.3s ease;
+        }
+        .stat-card:nth-child(2) { background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%); }
+        .stat-card:nth-child(3) { background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%); }
+        .stat-card:nth-child(4) { background: linear-gradient(135deg, #FF9800 0%, #F57C00 100%); }
+        .stat-card:nth-child(5) { background: linear-gradient(135deg, #9C27B0 0%, #7B1FA2 100%); }
+        .stat-card:hover { transform: translateY(-5px); }
+        .stat-value { font-size: 3em; font-weight: bold; margin-bottom: 10px; }
+        .stat-label { font-size: 1.1em; opacity: 0.9; }
+        .controls {
+            padding: 30px;
+            background: #f8f9fa;
+            border-top: 1px solid #dee2e6;
+        }
+        .control-section {
+            margin-bottom: 30px;
+        }
+        .control-section h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+        .form-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        input, select, button {
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        button {
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+        button:hover {
+            background: linear-gradient(135deg, #45a049 0%, #4CAF50 100%);
+        }
+        .danger { background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%); }
+        .info-panel {
+            background: #e3f2fd;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 30px;
+            border-left: 5px solid #2196F3;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            background: #4CAF50;
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🔧 Admin Panel - Tap to Earn Bot</h1>
-        <p>📁 Admin panel file not found. Please upload your admin HTML file as "admin.html" in the public folder.</p>
+        <div class="header">
+            <h1>🔧 Admin Panel</h1>
+            <p><span class="status-indicator"></span>Tap to Earn Bot - Live Dashboard</p>
+        </div>
         
-        <div class="stats">
+        <div class="info-panel">
+            <strong>🤖 Bot Status:</strong> @Taptoearnofficial_bot is running<br>
+            <strong>🔗 Webhook:</strong> https://tap-to-earn-bot.onrender.com/webhook<br>
+            <strong>⏰ Last Updated:</strong> ${new Date().toLocaleString()}
+        </div>
+        
+        <div class="stats-grid">
             <div class="stat-card">
-                <div class="stat-value">${users.size}</div>
+                <div class="stat-value">${stats.totalUsers}</div>
                 <div class="stat-label">Total Users</div>
             </div>
             <div class="stat-card">
-                <div class="stat-value">${Array.from(users.values()).reduce((sum, user) => sum + user.points, 0).toLocaleString()}</div>
+                <div class="stat-value">${stats.totalPoints.toLocaleString()}</div>
                 <div class="stat-label">Total Points</div>
             </div>
             <div class="stat-card">
-                <div class="stat-value">${Array.from(pendingWithdrawals.values()).filter(w => w.status === 'pending').length}</div>
+                <div class="stat-value">${stats.activePackages}</div>
+                <div class="stat-label">Active Packages</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">${stats.pendingWithdrawals}</div>
                 <div class="stat-label">Pending Withdrawals</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">${stats.totalTransactions}</div>
+                <div class="stat-label">Total Transactions</div>
             </div>
         </div>
         
-        <p><strong>Bot:</strong> @Taptoearnofficial_bot</p>
-        <p><strong>Webhook:</strong> ${WEBHOOK_URL}/webhook</p>
-        <p><strong>Status:</strong> ✅ Running</p>
+        <div class="controls">
+            <div class="control-section">
+                <h3>👥 User Management</h3>
+                <div class="form-group">
+                    <input type="text" id="userId" placeholder="User ID" />
+                    <select id="packageSelect">
+                        <option value="5">$5 Package</option>
+                        <option value="10">$10 Package</option>
+                        <option value="50">$50 Package</option>
+                        <option value="100">$100 Package</option>
+                        <option value="500">$500 Unlimited</option>
+                        <option value="1000">$1000 Premium</option>
+                    </select>
+                    <button onclick="activatePackage()">Activate Package</button>
+                </div>
+            </div>
+            
+            <div class="control-section">
+                <h3>💸 Withdrawal Management</h3>
+                <div class="form-group">
+                    <input type="text" id="withdrawalId" placeholder="Withdrawal ID" />
+                    <button onclick="processWithdrawal()">Process Withdrawal</button>
+                    <button onclick="refreshStats()">Refresh Stats</button>
+                </div>
+            </div>
+            
+            <div class="control-section">
+                <h3>📊 Quick Actions</h3>
+                <div class="form-group">
+                    <button onclick="window.open('/api/admin/stats', '_blank')">View Raw Stats</button>
+                    <button onclick="window.open('/api/health', '_blank')">Health Check</button>
+                    <button onclick="window.open('https://api.telegram.org/bot8105964064:AAE1rkye54RSBevmnYIIOBpCZnAkrMX-VsE/getWebhookInfo', '_blank')">Check Webhook</button>
+                </div>
+            </div>
+        </div>
     </div>
+    
+    <script>
+        async function activatePackage() {
+            const userId = document.getElementById('userId').value;
+            const packageId = document.getElementById('packageSelect').value;
+            
+            if (!userId) {
+                alert('Please enter a User ID');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/admin/activate-package', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId, packageId })
+                });
+                
+                const result = await response.json();
+                alert(result.message || 'Package activated successfully!');
+                
+                if (result.success) {
+                    document.getElementById('userId').value = '';
+                }
+            } catch (error) {
+                alert('Error activating package: ' + error.message);
+            }
+        }
+        
+        async function processWithdrawal() {
+            const withdrawalId = document.getElementById('withdrawalId').value;
+            
+            if (!withdrawalId) {
+                alert('Please enter a Withdrawal ID');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/admin/process-withdrawal', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ withdrawalId })
+                });
+                
+                const result = await response.json();
+                alert(result.message || 'Withdrawal processed!');
+                
+                if (result.success) {
+                    document.getElementById('withdrawalId').value = '';
+                }
+            } catch (error) {
+                alert('Error processing withdrawal: ' + error.message);
+            }
+        }
+        
+        function refreshStats() {
+            window.location.reload();
+        }
+        
+        // Auto-refresh stats every 30 seconds
+        setInterval(() => {
+            console.log('Auto-refreshing stats...');
+            // You can add AJAX calls here to update stats without full page reload
+        }, 30000);
+    </script>
 </body>
 </html>
         `;
@@ -892,7 +1380,11 @@ app.get('/admin', async (req, res) => {
         res.send(adminHtml);
     } catch (error) {
         console.error('Error serving admin panel:', error);
-        res.status(500).send('Error loading admin panel');
+        res.status(500).send(`
+            <h1>Admin Panel Error</h1>
+            <p>Error loading admin panel: ${error.message}</p>
+            <p><a href="/">Back to main page</a></p>
+        `);
     }
 });
 
